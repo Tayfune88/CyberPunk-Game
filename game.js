@@ -99,25 +99,31 @@ let projectiles = [];
 let particles = [];
 
 class Platform {
-    constructor(x, y, width, height, isWall = false) {
+    constructor(x, y, width, height, isWall = false, isOneWay = false) {
         this.x = x;
         this.y = y;
         this.width = width;
         this.height = height;
         this.isWall = isWall;
+        this.isOneWay = isOneWay;
     }
 
     draw(ctx) {
         ctx.fillStyle = '#223';
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+        if (this.isOneWay) {
+            // Draw one-way platform thinner visually
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+        } else {
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+        }
 
         // Neon edge
-        ctx.strokeStyle = this.isWall ? '#f0f' : '#0ff';
+        ctx.strokeStyle = this.isWall ? '#f0f' : (this.isOneWay ? '#ff0' : '#0ff');
         ctx.lineWidth = 2;
         ctx.strokeRect(this.x, this.y, this.width, this.height);
 
         ctx.shadowBlur = 10;
-        ctx.shadowColor = this.isWall ? '#f0f' : '#0ff';
+        ctx.shadowColor = this.isWall ? '#f0f' : (this.isOneWay ? '#ff0' : '#0ff');
         ctx.strokeRect(this.x, this.y, this.width, this.height);
         ctx.shadowBlur = 0;
     }
@@ -222,6 +228,27 @@ class Player {
                 // Dash Movement
                 this.vx = this.facingRight ? this.dashSpeed : -this.dashSpeed;
                 this.vy = 0; // No gravity during dash
+
+                // Lightning trail effect
+                let px = this.x + this.width/2 + (Math.random() - 0.5) * 30;
+                let py = this.y + this.height/2 + (Math.random() - 0.5) * 40;
+
+                particles.push({
+                    x: px,
+                    y: py,
+                    vx: 0,
+                    vy: 0,
+                    life: 0.2,
+                    color: '#fff' // White hot lightning core
+                });
+                particles.push({
+                    x: px,
+                    y: py,
+                    vx: 0,
+                    vy: 0,
+                    life: 0.3,
+                    color: '#0ff' // Cyan outer glow
+                });
             }
         } else {
             // Normal Movement
@@ -321,7 +348,7 @@ class Player {
         // Collision Detection - Horizontal
         this.x += dx;
         for (let p of platforms) {
-            if (AABB(this, p)) {
+            if (AABB(this, p) && !p.isOneWay) { // Ignore horizontal collision for one-way platforms
                 if (dx > 0) { // Moving right
                     this.x = p.x - this.width;
                     if (!this.grounded && p.isWall) {
@@ -340,15 +367,26 @@ class Player {
         }
 
         // Collision Detection - Vertical
+        let oldY = this.y - dy; // Previous position to check if we were above
         this.y += dy;
         for (let p of platforms) {
             if (AABB(this, p)) {
                 if (dy > 0) { // Falling
-                    this.y = p.y - this.height;
-                    this.grounded = true;
-                    this.vy = 0;
-                    this.onWall = false; // Reset wall run if grounded
-                } else if (dy < 0) { // Jumping into ceiling
+                    // For one-way platforms, only collide if we were fully above it previously
+                    if (p.isOneWay) {
+                        if (oldY + this.height <= p.y + 0.1) {
+                            this.y = p.y - this.height;
+                            this.grounded = true;
+                            this.vy = 0;
+                            this.onWall = false;
+                        }
+                    } else {
+                        this.y = p.y - this.height;
+                        this.grounded = true;
+                        this.vy = 0;
+                        this.onWall = false; // Reset wall run if grounded
+                    }
+                } else if (dy < 0 && !p.isOneWay) { // Jumping into ceiling (ignore one-way)
                     this.y = p.y + p.height;
                     this.vy = 0;
                 }
@@ -378,227 +416,212 @@ class Player {
             ctx.scale(-1, 1);
         }
 
-        // Only glow when dashing
-        ctx.shadowBlur = this.isDashing ? 15 : 0;
-        ctx.shadowColor = this.isDashing ? '#fff' : 'transparent';
-
-        // --- Draw Cyborg Warrior (Geometric Design) ---
-        let runBob = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 20) * 3 : 0;
-        let lean = this.vx !== 0 && this.grounded ? (this.vx > 0 ? 0.1 : -0.1) : 0;
-        if (!this.facingRight && lean !== 0) lean = -lean; // Adjust lean for facing direction
+        let isRunning = this.grounded && Math.abs(this.vx) > 10;
+        let runBob = isRunning ? Math.sin(this.animTimer * 20) * 4 : 0;
+        let lean = isRunning ? (this.vx > 0 ? 0.15 : -0.15) : 0;
+        if (!this.facingRight && lean !== 0) lean = -lean;
 
         ctx.rotate(lean);
 
-        // Core Torso Armor
-        ctx.fillStyle = '#1a1a1a'; // Dark grey armor
-        ctx.strokeStyle = this.isDashing ? '#fff' : '#333';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(-12, -18 + runBob); // Top left shoulder
-        ctx.lineTo(12, -18 + runBob);  // Top right shoulder
-        ctx.lineTo(8, 4 + runBob);    // Bottom right waist
-        ctx.lineTo(-8, 4 + runBob);   // Bottom left waist
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+        // --- Core Cyborg Body ---
 
-        // Chest Plate Accent
+        // Torso
         ctx.fillStyle = '#222';
+        ctx.strokeStyle = this.isDashing ? '#0ff' : '#444';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(-6, -14 + runBob);
-        ctx.lineTo(6, -14 + runBob);
-        ctx.lineTo(4, -2 + runBob);
-        ctx.lineTo(-4, -2 + runBob);
-        ctx.closePath();
-        ctx.fill();
-
-        // Glowing Neon Spine/Core
-        ctx.fillStyle = this.color;
-        ctx.shadowBlur = this.isDashing ? 20 : 5;
-        ctx.shadowColor = this.color;
-        ctx.fillRect(-1, -12 + runBob, 2, 10);
-        ctx.shadowBlur = 0; // Reset glow for other parts
-
-        // Cybernetic Helmet
-        ctx.fillStyle = '#111';
-        ctx.strokeStyle = '#444';
-        ctx.beginPath();
-        ctx.moveTo(-8, -20 + runBob);
-        ctx.lineTo(8, -20 + runBob);
-        ctx.lineTo(6, -30 + runBob);
-        ctx.lineTo(-6, -30 + runBob);
+        ctx.moveTo(-10, -20 + runBob);
+        ctx.lineTo(10, -20 + runBob);
+        ctx.lineTo(8, 5 + runBob);
+        ctx.lineTo(-8, 5 + runBob);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // Visor (Neon Slit)
-        ctx.fillStyle = '#fff';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = this.color;
-        ctx.fillRect(0, -28 + runBob, 9, 4); // Wider, asymmetrical visor
+        // Cybernetic Spine (Neon Core)
+        ctx.fillStyle = '#0ff';
+        ctx.shadowBlur = this.isDashing ? 25 : 10;
+        ctx.shadowColor = '#0ff';
+        ctx.fillRect(-2, -15 + runBob, 4, 15);
         ctx.shadowBlur = 0;
 
-        // Gun Arm (Front/Right) - Heavy Magnum
-        let armAngle = 0;
-        // Aiming slightly based on mouse, but default to forward
-        if (!this.grounded) armAngle = -0.5;
-        if (this.onWall) armAngle = -1.5;
+        // --- Head/Helmet ---
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.moveTo(-8, -22 + runBob);
+        ctx.lineTo(8, -22 + runBob);
+        ctx.lineTo(6, -34 + runBob);
+        ctx.lineTo(-6, -34 + runBob);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
 
-        // Add recoil if recently fired
+        // Visor (Glowing Eye)
+        let blink = Math.sin(this.animTimer * 10) > 0.8 ? 0 : 1; // Random fast blink
+        if (blink) {
+            ctx.fillStyle = '#f0f';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#f0f';
+            ctx.fillRect(0, -30 + runBob, 8, 4);
+            ctx.shadowBlur = 0;
+        }
+
+        // --- Right Arm (Gun Arm) ---
+        let armAngle = 0;
+        if (!this.grounded) armAngle = -0.3;
+        if (this.onWall) armAngle = -1.5;
+        // Recoil animation
         if (this.rangedCooldownTimer > this.rangedCooldown - 0.1) {
-            armAngle -= 0.5; // Kick upward
+            armAngle -= 0.6;
+            runBob -= 2; // Full body recoil
         }
 
         ctx.save();
-        ctx.translate(5, -10 + runBob);
+        ctx.translate(5, -12 + runBob);
         ctx.rotate(armAngle);
 
-        // Cyber Arm (Shoulder & Bicep)
-        ctx.fillStyle = '#2a2a2a';
-        ctx.fillRect(-2, -4, 10, 8);
-
-        // Forearm / Gun Integration
-        ctx.fillStyle = '#151515';
-        ctx.fillRect(8, -5, 14, 7);
-
-        // Gun Accents
+        // Shoulder
         ctx.fillStyle = '#333';
-        ctx.fillRect(12, 2, 8, 3);
+        ctx.beginPath();
+        ctx.arc(0, 0, 6, 0, Math.PI * 2);
+        ctx.fill();
 
-        // Neon details
-        ctx.strokeStyle = '#f0f'; // Railgun accent
-        ctx.lineWidth = 1;
-        ctx.strokeRect(8, -4, 12, 5);
+        // Arm
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-3, 0, 6, 15);
 
-        // Muzzle flash / glowing tip
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#f0f';
-        ctx.fillStyle = '#f0f';
-        ctx.fillRect(20, -3, 2, 3);
-        ctx.shadowBlur = 0;
+        // Gun
+        ctx.fillStyle = '#111';
+        ctx.fillRect(-4, 10, 18, 6);
+        ctx.strokeStyle = '#0ff';
+        ctx.strokeRect(-4, 10, 18, 6);
 
+        // Muzzle Flash
+        if (this.rangedCooldownTimer > this.rangedCooldown - 0.05) {
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#0ff';
+            ctx.beginPath();
+            ctx.arc(16, 13, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
         ctx.restore();
 
-        // Sword Arm (Back/Left) - Big Cyber Sword
+        // --- Left Arm (Sword Arm) ---
         ctx.save();
-        ctx.translate(-5, -10 + runBob);
+        ctx.translate(-5, -12 + runBob);
+
+        let swordGlow = (Math.sin(this.animTimer * 15) + 1) / 2; // 0 to 1 pulsing
 
         if (this.isAttackingMelee) {
             let swingProg = 1 - (this.meleeTimer / this.meleeDuration);
-            // Heavy downward slam arc: starts high behind, ends low in front
-            ctx.rotate(-Math.PI * 0.8 + swingProg * Math.PI * 1.5);
-        } else if (Math.abs(this.vx) > 10 && this.grounded) {
-            // Dragging/running pose
-            ctx.rotate(Math.PI * 0.2 + Math.sin(this.animTimer * 20) * 0.2);
+            // Dynamic swooping attack
+            ctx.rotate(-Math.PI * 0.5 + swingProg * Math.PI * 1.8);
+            ctx.translate(swingProg * 10, 0); // Lunge forward slightly
+        } else if (isRunning) {
+            ctx.rotate(Math.PI * 0.2 + Math.sin(this.animTimer * 20) * 0.4);
         } else {
-            // Idle resting pose on shoulder
-            ctx.rotate(-Math.PI * 0.4);
+            ctx.rotate(-Math.PI * 0.1);
         }
 
-        // Left Cyber Arm (Melee)
-        ctx.fillStyle = '#2a2a2a';
-        ctx.fillRect(-2, -4, 12, 8);
+        // Shoulder
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(0, 0, 6, 0, Math.PI * 2);
+        ctx.fill();
 
-        // Forearm
-        ctx.fillStyle = '#151515';
-        ctx.fillRect(10, -3, 8, 6);
+        // Arm
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-3, 0, 6, 12);
 
-        // Sword Grip
+        // The Giant Sword
+        ctx.translate(0, 12); // Move to hand
+
+        // Hilt
         ctx.fillStyle = '#111';
-        ctx.fillRect(18, -4, 8, 8);
+        ctx.fillRect(-2, -2, 4, 10);
 
         // Crossguard
-        ctx.fillStyle = '#444';
-        ctx.fillRect(26, -9, 4, 18);
+        ctx.fillStyle = '#555';
+        ctx.fillRect(-6, 8, 12, 4);
 
-        // Giant Neon Blade
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = '#0f0'; // Neon Green for contrast
+        // Glowing Blade
         ctx.fillStyle = '#0f0';
+        ctx.shadowBlur = 15 + swordGlow * 15; // Pulsing blur
+        ctx.shadowColor = '#0f0';
+
         ctx.beginPath();
-        ctx.moveTo(27, -4); // Bottom edge
-        ctx.lineTo(65, -6); // Tip bottom
-        ctx.lineTo(70, -2); // Tip point
-        ctx.lineTo(60, 4);  // Tip top
-        ctx.lineTo(27, 2);  // Top edge
+        ctx.moveTo(-4, 12);
+        ctx.lineTo(4, 12);
+        ctx.lineTo(6, 45); // Thick blade
+        ctx.lineTo(0, 60); // Sharp tip
+        ctx.lineTo(-6, 45);
         ctx.closePath();
         ctx.fill();
 
-        // Inner bright core of the blade
-        ctx.shadowBlur = 0;
+        // Bright core of blade
         ctx.fillStyle = '#fff';
+        ctx.shadowBlur = 0;
         ctx.beginPath();
-        ctx.moveTo(28, -2);
-        ctx.lineTo(64, -3);
-        ctx.lineTo(66, -1);
-        ctx.lineTo(58, 1);
-        ctx.lineTo(28, 0);
+        ctx.moveTo(-1, 12);
+        ctx.lineTo(1, 12);
+        ctx.lineTo(2, 44);
+        ctx.lineTo(0, 56);
+        ctx.lineTo(-2, 44);
         ctx.closePath();
         ctx.fill();
 
         ctx.restore();
 
-        // Cybernetic Legs (Thick, geometric)
-        let legSwing = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 20) * 12 : 0;
-        let legSpread = this.grounded ? 0 : 8;
+        // --- Legs ---
+        let legSwing = isRunning ? Math.sin(this.animTimer * 20) * 15 : 0;
+        let legSpread = this.grounded ? 0 : 10;
         if (this.onWall) { legSwing = 0; legSpread = 0; }
 
-        // Back Leg (Darker)
-        ctx.fillStyle = '#1a1a1a';
-        ctx.beginPath();
-        ctx.moveTo(-6, 4 + runBob);
-        ctx.lineTo(-2, 4 + runBob);
-        ctx.lineTo(-2 - legSwing - legSpread, 26);
-        ctx.lineTo(-8 - legSwing - legSpread, 26);
-        ctx.closePath();
-        ctx.fill();
+        // Back Leg
+        ctx.fillStyle = '#111';
+        ctx.fillRect(-6, 5 + runBob, 6, 10); // Thigh
+        ctx.save();
+        ctx.translate(-3, 15 + runBob);
+        ctx.rotate(-legSwing * 0.05);
+        ctx.fillRect(-2, 0, 4, 12 + legSpread); // Calf
+        ctx.restore();
 
-        // Front Leg (Lighter)
-        ctx.fillStyle = '#2a2a2a';
-        ctx.beginPath();
-        ctx.moveTo(2, 4 + runBob);
-        ctx.lineTo(8, 4 + runBob);
-        ctx.lineTo(8 + legSwing + legSpread, 26);
-        ctx.lineTo(2 + legSwing + legSpread, 26);
-        ctx.closePath();
-        ctx.fill();
+        // Front Leg
+        ctx.fillStyle = '#333';
+        ctx.fillRect(0, 5 + runBob, 6, 10); // Thigh
+        ctx.save();
+        ctx.translate(3, 15 + runBob);
+        ctx.rotate(legSwing * 0.05);
+        ctx.fillRect(-2, 0, 4, 12 + legSpread); // Calf
+        // Neon accent on front leg
+        ctx.fillStyle = '#0ff';
+        ctx.fillRect(-1, 2, 2, 8);
+        ctx.restore();
 
-        // Neon Accents on legs
-        ctx.fillStyle = this.color;
-        ctx.fillRect(4 + legSwing + legSpread, 15, 2, 8);
+        ctx.restore(); // Restore global player transform
 
-        ctx.restore(); // Restore facing right transform
-        ctx.shadowBlur = 0;
-
-        // Draw Heavy Melee Hitbox swoosh
+        // --- Melee Hitbox Effect (Swoosh) ---
         if (this.isAttackingMelee && !this.isDashing) {
-            ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
-            ctx.shadowBlur = 15;
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.4)';
+            ctx.shadowBlur = 20;
             ctx.shadowColor = '#0f0';
 
-            let hitboxWidth = 70; // Larger hitbox for big sword
-            let hitboxHeight = 80;
-            let hx = this.facingRight ? this.x + this.width : this.x - hitboxWidth;
-            let hy = this.y + this.height/2 - hitboxHeight/2;
+            let hx = this.facingRight ? this.x + this.width/2 : this.x + this.width/2;
+            let hy = this.y + this.height/2;
+            let radius = 60;
+            let swingProg = 1 - (this.meleeTimer / this.meleeDuration);
 
-            // Big crescent slash
             ctx.beginPath();
-            ctx.moveTo(this.facingRight ? this.x + this.width/2 : this.x + this.width/2, this.y - 20);
-
-            if(this.facingRight) {
-                ctx.bezierCurveTo(hx + hitboxWidth + 20, hy - 30, hx + hitboxWidth + 20, hy + hitboxHeight + 30, this.x + this.width/2, this.y + this.height + 20);
-                ctx.bezierCurveTo(hx + hitboxWidth, hy + hitboxHeight, hx + hitboxWidth, hy, this.x + this.width/2, this.y);
+            if (this.facingRight) {
+                ctx.arc(hx, hy, radius, -Math.PI/2, -Math.PI/2 + swingProg * Math.PI, false);
+                ctx.arc(hx, hy, radius - 20, -Math.PI/2 + swingProg * Math.PI, -Math.PI/2, true);
             } else {
-                ctx.bezierCurveTo(hx - 20, hy - 30, hx - 20, hy + hitboxHeight + 30, this.x + this.width/2, this.y + this.height + 20);
-                ctx.bezierCurveTo(hx, hy + hitboxHeight, hx, hy, this.x + this.width/2, this.y);
+                ctx.arc(hx, hy, radius, -Math.PI/2, -Math.PI/2 - swingProg * Math.PI, true);
+                ctx.arc(hx, hy, radius - 20, -Math.PI/2 - swingProg * Math.PI, -Math.PI/2, false);
             }
-
             ctx.fill();
-
-            ctx.strokeStyle = '#0f0';
-            ctx.lineWidth = 4;
-            ctx.stroke();
-
             ctx.shadowBlur = 0;
         }
     }
@@ -802,306 +825,6 @@ class Enemy {
     }
 }
 
-class MeleeEnemy {
-    constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.width = 30;
-        this.height = 50;
-        this.color = '#f50';
-
-        // Physics
-        this.vx = 0;
-        this.vy = 0;
-        this.speed = 150;
-        this.gravity = 1500;
-        this.grounded = false;
-
-        // State
-        this.hp = 150;
-        this.maxHp = 150;
-        this.facingRight = false;
-        this.animTimer = Math.random() * 10;
-
-        // Combat
-        this.isAttacking = false;
-        this.attackTimer = 0;
-        this.attackDuration = 0.4;
-        this.attackCooldown = 1.0;
-        this.attackCooldownTimer = 0;
-        this.attackRange = 60;
-    }
-
-    update(dt) {
-        // AI Logic
-        let dx = player.x - this.x;
-        let dist = Math.abs(dx);
-
-        if (this.attackCooldownTimer > 0) this.attackCooldownTimer -= dt;
-
-        if (this.isAttacking) {
-            this.vx = 0; // Stop moving while attacking
-            this.attackTimer -= dt;
-            if (this.attackTimer <= 0) {
-                this.isAttacking = false;
-                // Deal damage at the end of the swing
-                if (dist < this.attackRange + player.width && Math.sign(dx) === (this.facingRight ? 1 : -1) && Math.abs(player.y - this.y) < 60) {
-                    if (!player.isDashing) {
-                        player.takeDamage(15);
-                        player.vx = this.facingRight ? 300 : -300; // Knockback
-                        createParticles(player.x + player.width/2, player.y + player.height/2, 15, '#f00');
-                    }
-                }
-            }
-        } else {
-            // Chase player if within horizontal range
-            if (dist < 600 && Math.abs(player.y - this.y) < 200) {
-                if (dx > 0) {
-                    this.vx = this.speed;
-                    this.facingRight = true;
-                } else {
-                    this.vx = -this.speed;
-                    this.facingRight = false;
-                }
-
-                // Attack if close enough
-                if (dist < this.attackRange && this.attackCooldownTimer <= 0) {
-                    this.isAttacking = true;
-                    this.attackTimer = this.attackDuration;
-                    this.attackCooldownTimer = this.attackCooldown;
-                }
-            } else {
-                this.vx = 0; // Idle
-            }
-        }
-
-        // Apply Gravity
-        if (!this.grounded) {
-            this.vy += this.gravity * dt;
-        }
-
-        // Animation
-        if (this.vx !== 0) {
-            this.animTimer += dt;
-        }
-
-        // Movement & Collision
-        let moveX = this.vx * dt;
-        let moveY = this.vy * dt;
-
-        this.grounded = false;
-
-        // Horizontal Collision
-        this.x += moveX;
-        for (let p of platforms) {
-            if (AABB(this, p)) {
-                if (moveX > 0) {
-                    this.x = p.x - this.width;
-                } else if (moveX < 0) {
-                    this.x = p.x + p.width;
-                }
-                this.vx = 0;
-            }
-        }
-
-        // Vertical Collision
-        this.y += moveY;
-        for (let p of platforms) {
-            if (AABB(this, p)) {
-                if (moveY > 0) {
-                    this.y = p.y - this.height;
-                    this.grounded = true;
-                    this.vy = 0;
-                } else if (moveY < 0) {
-                    this.y = p.y + p.height;
-                    this.vy = 0;
-                }
-            }
-        }
-
-        // Screen bounds (fall off)
-        if (this.y > canvas.height + 200) {
-            this.takeDamage(1000);
-        }
-    }
-
-    draw(ctx) {
-        ctx.save();
-        ctx.translate(this.x + this.width/2, this.y + this.height/2);
-
-        if (!this.facingRight) {
-            ctx.scale(-1, 1);
-        }
-
-        ctx.shadowBlur = 0; // Disable global glow to prevent ghosting
-
-        let runBob = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 15) * 3 : 0;
-        let lean = this.vx !== 0 && this.grounded ? (this.vx > 0 ? 0.1 : -0.1) : 0;
-        if (!this.facingRight && lean !== 0) lean = -lean;
-
-        ctx.rotate(lean);
-
-        // Core Torso Armor
-        ctx.fillStyle = '#211'; // Dark red/brown armor
-        ctx.strokeStyle = '#422';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(-12, -18 + runBob);
-        ctx.lineTo(12, -18 + runBob);
-        ctx.lineTo(9, 5 + runBob);
-        ctx.lineTo(-9, 5 + runBob);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        // Chest Plate Accent
-        ctx.fillStyle = '#311';
-        ctx.beginPath();
-        ctx.moveTo(-7, -14 + runBob);
-        ctx.lineTo(7, -14 + runBob);
-        ctx.lineTo(5, -2 + runBob);
-        ctx.lineTo(-5, -2 + runBob);
-        ctx.closePath();
-        ctx.fill();
-
-        // Glowing Core
-        ctx.fillStyle = '#f00';
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = '#f00';
-        ctx.beginPath();
-        ctx.arc(0, -8 + runBob, 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-
-        // Blocky Helmet
-        ctx.fillStyle = '#1a0d0d';
-        ctx.strokeStyle = '#522';
-        ctx.beginPath();
-        ctx.moveTo(-9, -19 + runBob);
-        ctx.lineTo(9, -19 + runBob);
-        ctx.lineTo(7, -32 + runBob);
-        ctx.lineTo(-7, -32 + runBob);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        // Glowing Visor
-        ctx.fillStyle = '#f00';
-        ctx.shadowBlur = 12;
-        ctx.shadowColor = '#f00';
-        ctx.fillRect(2, -28 + runBob, 6, 5); // Aggressive single eye slot
-        ctx.shadowBlur = 0;
-
-        // Sword Arm (Thicker, armored)
-        ctx.save();
-        ctx.translate(6, -12 + runBob);
-
-        if (this.isAttacking) {
-            let swingProg = 1 - (this.attackTimer / this.attackDuration);
-            ctx.rotate(-Math.PI * 0.8 + swingProg * Math.PI * 1.5);
-        } else if (Math.abs(this.vx) > 10 && this.grounded) {
-            ctx.rotate(Math.PI * 0.2 + Math.sin(this.animTimer * 15) * 0.3);
-        } else {
-            ctx.rotate(-Math.PI * 0.3);
-        }
-
-        // Upper Arm
-        ctx.fillStyle = '#3a1a1a';
-        ctx.fillRect(-2, -4, 12, 8);
-
-        // Forearm
-        ctx.fillStyle = '#2a0a0a';
-        ctx.fillRect(10, -3, 10, 6);
-
-        // Enemy Sword
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = '#f50';
-        ctx.fillStyle = '#f50';
-        ctx.beginPath();
-        ctx.moveTo(15, -2);
-        ctx.lineTo(45, -4);
-        ctx.lineTo(50, 0);
-        ctx.lineTo(45, 4);
-        ctx.lineTo(15, 2);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.moveTo(16, -1);
-        ctx.lineTo(44, -2);
-        ctx.lineTo(47, 0);
-        ctx.lineTo(44, 2);
-        ctx.lineTo(16, 1);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.restore();
-
-        // Cyber Legs (Geometric)
-        let legSwing = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 15) * 12 : 0;
-
-        // Back Leg
-        ctx.fillStyle = '#221111';
-        ctx.beginPath();
-        ctx.moveTo(-7, 5 + runBob);
-        ctx.lineTo(-3, 5 + runBob);
-        ctx.lineTo(-3 - legSwing, 25);
-        ctx.lineTo(-9 - legSwing, 25);
-        ctx.closePath();
-        ctx.fill();
-
-        // Front Leg
-        ctx.fillStyle = '#3a1a1a';
-        ctx.beginPath();
-        ctx.moveTo(3, 5 + runBob);
-        ctx.lineTo(9, 5 + runBob);
-        ctx.lineTo(9 + legSwing, 25);
-        ctx.lineTo(3 + legSwing, 25);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.restore();
-
-        // Attack Hitbox visualization
-        if (this.isAttacking) {
-            ctx.fillStyle = 'rgba(255, 80, 0, 0.4)';
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#f50';
-            let swingProg = 1 - (this.attackTimer / this.attackDuration);
-
-            ctx.beginPath();
-            if (this.facingRight) {
-                ctx.arc(this.x + this.width/2, this.y + this.height/2, this.attackRange, -Math.PI/2, -Math.PI/2 + swingProg * Math.PI, false);
-            } else {
-                ctx.arc(this.x + this.width/2, this.y + this.height/2, this.attackRange, -Math.PI/2, -Math.PI/2 - swingProg * Math.PI, true);
-            }
-            ctx.lineTo(this.x + this.width/2, this.y + this.height/2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
-        }
-
-        // Draw Health Bar
-        ctx.fillStyle = '#222';
-        ctx.fillRect(this.x, this.y - 15, this.width, 4);
-        ctx.fillStyle = '#f50';
-        ctx.fillRect(this.x, this.y - 15, this.width * (this.hp / this.maxHp), 4);
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(this.x, this.y - 15, this.width, 4);
-    }
-
-    takeDamage(amount) {
-        this.hp -= amount;
-        if (this.hp <= 0) {
-            createParticles(this.x + this.width/2, this.y + this.height/2, 40, this.color);
-            gameState.score += 150;
-            scoreDisplay.innerText = gameState.score;
-            this.dead = true;
-        }
-    }
-}
 
 let enemySpawnTimer = 0;
 const enemySpawnRate = 3.0; // seconds
@@ -1195,11 +918,11 @@ function generatePlatforms() {
     while (floatsCreated < 4 && floatAttempts < 20) {
         floatAttempts++;
         let fx = startX + Math.random() * (platformGenerator.chunkWidth - 100);
-        let fy = 150 + Math.random() * 200;
-        let fw = 80 + Math.random() * 100;
+        let fy = 200 + Math.random() * 150;
+        let fw = 80 + Math.random() * 150;
 
         let valid = true;
-        let newFloat = new Platform(fx, fy, fw, 20);
+        let newFloat = new Platform(fx, fy, fw, 20, false, true); // Set as one-way platform
 
         // Check if platform is directly above a wall obstacle, which would trap the player
         for (let p of platforms) {
@@ -1246,7 +969,7 @@ function initGame() {
     enemySpawnTimer = 2.0;
 
     // Spawn initial enemy ahead
-    enemies.push(new MeleeEnemy(600, 450));
+    enemies.push(new Enemy(600, 300));
 
     gameState.lastTime = performance.now();
     requestAnimationFrame(gameLoop);
@@ -1285,15 +1008,8 @@ function update(deltaTime) {
         enemySpawnTimer = enemySpawnRate;
         if (enemies.length < 5) { // Max enemies on screen
             let ex = camera.x + canvas.width + Math.random() * 200;
-
-            // 80% chance for Melee Enemy, 20% chance for Drone
-            if (Math.random() < 0.8) {
-                let ey = 300; // Spawn higher up so they fall onto a platform
-                enemies.push(new MeleeEnemy(ex, ey));
-            } else {
-                let ey = Math.random() * 300 + 50;
-                enemies.push(new Enemy(ex, ey)); // Drone
-            }
+            let ey = Math.random() * 300 + 50;
+            enemies.push(new Enemy(ex, ey)); // Drone
         }
     }
 
@@ -1303,11 +1019,21 @@ function update(deltaTime) {
         enemy.update(deltaTime);
 
         // Check collision with player
-        if (enemy instanceof Enemy && AABB(player, enemy) && !player.isDashing) {
-            player.takeDamage(5); // Collision damage
-            // Push player back slightly
-            let dx = player.x - enemy.x;
-            player.vx = dx > 0 ? 200 : -200;
+        if (enemy instanceof Enemy && AABB(player, enemy)) {
+            if (player.isDashing) {
+                // Dash attack: lightning strike through enemies
+                enemy.takeDamage(100);
+
+                // Lightning visual effect
+                createParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, 20, '#0ff'); // Cyan flash
+
+                // Optional: Give player some invincibility frames or energy back on dash kill
+            } else {
+                player.takeDamage(5); // Collision damage
+                // Push player back slightly
+                let dx = player.x - enemy.x;
+                player.vx = dx > 0 ? 200 : -200;
+            }
         }
 
         if (enemy.dead) {
