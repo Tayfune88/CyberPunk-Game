@@ -5,15 +5,25 @@ const healthBar = document.getElementById('health-bar');
 const energyBar = document.getElementById('energy-bar');
 const gameOverScreen = document.getElementById('game-over-screen');
 const restartBtn = document.getElementById('restart-btn');
+const startScreen = document.getElementById('start-screen');
+const startBtn = document.getElementById('start-btn');
+const uiLayer = document.getElementById('ui-layer');
 
 // Game State
 let gameState = {
-    running: true,
+    running: false,
     score: 0,
     lastTime: 0,
     gravity: 0.8,
     friction: 0.8,
     deltaTime: 0
+};
+
+// Camera
+let camera = {
+    x: 0,
+    y: 0,
+    offset: 200 // Player position on screen from left
 };
 
 // Input handling
@@ -145,6 +155,7 @@ class Player {
         this.maxHp = 100;
         this.energy = 100;
         this.maxEnergy = 100;
+        this.animTimer = 0;
 
         // Abilities
         this.canDash = true;
@@ -281,17 +292,22 @@ class Player {
                 mouse.rightClick = false; // Prevent holding
 
                 // Calculate direction towards mouse
-                const rect = canvas.getBoundingClientRect();
-                // We use the player center as origin
                 const originX = this.x + this.width/2;
                 const originY = this.y + this.height/2;
 
-                const angle = Math.atan2(mouse.y - originY, mouse.x - originX);
+                // Adjust mouse coordinates with camera
+                const worldMouseX = mouse.x + camera.x;
+                const worldMouseY = mouse.y;
+
+                const angle = Math.atan2(worldMouseY - originY, worldMouseX - originX);
                 const speed = 800;
 
                 projectiles.push(new Projectile(originX, originY, Math.cos(angle) * speed, Math.sin(angle) * speed, true));
             }
         }
+
+        // Animation
+        this.animTimer += dt;
 
         // Apply velocities
         let dx = this.vx * dt;
@@ -343,30 +359,114 @@ class Player {
         if (this.y > canvas.height) {
             this.takeDamage(100); // Fall off screen
         }
-        if (this.x < 0) this.x = 0;
-        if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+        // Left bound relative to camera
+        if (this.x < camera.x) {
+            this.x = camera.x;
+            this.vx = 0;
+        }
+        // Right bound prevents player from moving out of right view
+        if (this.x > camera.x + canvas.width - this.width) {
+            this.x = camera.x + canvas.width - this.width;
+            this.vx = 0;
+        }
     }
 
     draw(ctx) {
-        // Neon Glow
-        ctx.shadowBlur = 15;
+        ctx.save();
+        ctx.translate(this.x + this.width/2, this.y + this.height/2);
+
+        if (!this.facingRight) {
+            ctx.scale(-1, 1);
+        }
+
+        ctx.shadowBlur = this.isDashing ? 20 : 10;
         ctx.shadowColor = this.isDashing ? '#fff' : this.color;
 
-        ctx.fillStyle = this.isDashing ? '#fff' : '#111';
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+        // --- Draw Cyborg Warrior ---
+        let runBob = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 20) * 3 : 0;
 
+        // Torso
+        ctx.fillStyle = '#111';
         ctx.strokeStyle = this.isDashing ? '#fff' : this.color;
         ctx.lineWidth = 2;
-        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.beginPath();
+        ctx.moveTo(-10, -15 + runBob);
+        ctx.lineTo(10, -15 + runBob);
+        ctx.lineTo(8, 5 + runBob);
+        ctx.lineTo(-8, 5 + runBob);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Head/Helmet
+        ctx.beginPath();
+        ctx.arc(0, -22 + runBob, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Visor (Neon Eye)
+        ctx.fillStyle = '#fff';
+        ctx.shadowBlur = 15;
+        ctx.fillRect(2, -24 + runBob, 6, 3);
+        ctx.shadowBlur = this.isDashing ? 20 : 10;
+
+        // Gun Arm (Front/Right)
+        let armAngle = 0;
+        if (!this.grounded) armAngle = -0.5;
+        if (this.onWall) armAngle = -1.5;
+
+        ctx.save();
+        ctx.translate(5, -10 + runBob);
+        ctx.rotate(armAngle);
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, -2, 15, 4);
+        ctx.strokeStyle = '#f0f'; // Railgun accent
+        ctx.strokeRect(0, -2, 15, 4);
+        ctx.restore();
+
+        // Sword Arm (Back/Left)
+        ctx.save();
+        ctx.translate(-5, -10 + runBob);
+        if (this.isAttackingMelee) {
+            let swingProg = 1 - (this.meleeTimer / this.meleeDuration);
+            ctx.rotate(-Math.PI/2 + swingProg * Math.PI);
+        } else if (Math.abs(this.vx) > 10 && this.grounded) {
+            ctx.rotate(Math.sin(this.animTimer * 20) * 0.5); // Running swing
+        } else {
+            ctx.rotate(0.5); // Idle pose
+        }
+
+        // Arm
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, -2, 12, 4);
+
+        // Katana Blade
+        ctx.shadowColor = '#f50';
+        ctx.fillStyle = '#f50';
+        ctx.beginPath();
+        ctx.moveTo(12, -1);
+        ctx.lineTo(35, -2);
+        ctx.lineTo(38, 0);
+        ctx.lineTo(12, 1);
+        ctx.fill();
+        ctx.restore();
+
+        // Legs
+        let legSwing = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 20) * 10 : 0;
+        let legSpread = this.grounded ? 0 : 5;
+        if (this.onWall) { legSwing = 0; legSpread = 0; }
+
+        ctx.strokeStyle = this.isDashing ? '#fff' : this.color;
+        // Back leg
+        ctx.beginPath(); ctx.moveTo(-4, 5 + runBob); ctx.lineTo(-4 - legSwing - legSpread, 25); ctx.stroke();
+        // Front leg
+        ctx.beginPath(); ctx.moveTo(4, 5 + runBob); ctx.lineTo(4 + legSwing + legSpread, 25); ctx.stroke();
+
+        ctx.restore(); // Restore facing right transform
         ctx.shadowBlur = 0;
 
-        // Direction indicator (Eye)
-        ctx.fillStyle = '#fff';
-        let eyeX = this.facingRight ? this.x + this.width - 8 : this.x + 4;
-        ctx.fillRect(eyeX, this.y + 10, 4, 4);
-
-        // Draw Melee Attack Hitbox
-        if (this.isAttackingMelee) {
+        // Draw Melee Hitbox swoosh
+        if (this.isAttackingMelee && !this.isDashing) {
             ctx.fillStyle = 'rgba(255, 100, 0, 0.7)';
             ctx.shadowBlur = 10;
             ctx.shadowColor = '#f50';
@@ -465,11 +565,12 @@ class Enemy {
     constructor(x, y) {
         this.x = x;
         this.y = y;
-        this.width = 30;
-        this.height = 30;
+        this.width = 35;
+        this.height = 35;
         this.hp = 100;
         this.speed = 100;
         this.color = '#f00';
+        this.animTimer = Math.random() * 10;
 
         // Firing logic
         this.fireCooldown = 2.0;
@@ -509,19 +610,58 @@ class Enemy {
     }
 
     draw(ctx) {
-        ctx.fillStyle = '#222';
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+        this.animTimer += gameState.deltaTime;
 
+        ctx.save();
+        // Hovering effect
+        let hoverY = Math.sin(this.animTimer * 4) * 5;
+        ctx.translate(this.x + this.width/2, this.y + this.height/2 + hoverY);
+
+        // Face player
+        if (player.x < this.x) {
+            ctx.scale(-1, 1);
+        }
+
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = this.color;
+
+        // Drone Core/Body
+        ctx.fillStyle = '#222';
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 2;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = this.color;
-        ctx.strokeRect(this.x, this.y, this.width, this.height);
 
-        // Inner "eye"
-        ctx.fillStyle = this.color;
-        ctx.fillRect(this.x + 10, this.y + 10, 10, 10);
+        ctx.beginPath();
+        ctx.moveTo(-15, -10);
+        ctx.lineTo(10, -15);
+        ctx.lineTo(15, 0);
+        ctx.lineTo(5, 15);
+        ctx.lineTo(-10, 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
 
+        // Thruster
+        ctx.fillStyle = '#f00';
+        ctx.beginPath();
+        ctx.moveTo(-10, 10);
+        ctx.lineTo(-5, 20 + Math.random() * 5);
+        ctx.lineTo(5, 15);
+        ctx.fill();
+
+        // Eye/Sensor
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(5, -2, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Gun mount
+        ctx.strokeStyle = '#fff';
+        ctx.beginPath();
+        ctx.moveTo(15, 0);
+        ctx.lineTo(20, 5);
+        ctx.stroke();
+
+        ctx.restore();
         ctx.shadowBlur = 0;
     }
 
@@ -578,23 +718,57 @@ function drawParticles(ctx) {
     }
 }
 
+let platformGenerator = {
+    lastX: 0,
+    chunkWidth: 800
+};
+
 function initLevel() {
     platforms = [];
-    // Floor
+    platformGenerator.lastX = 0;
+
+    // Initial safe zone
     platforms.push(new Platform(0, 550, 800, 50));
+    platforms.push(new Platform(0, 0, 50, 550, true)); // Starting left wall
 
-    // Left Wall
-    platforms.push(new Platform(0, 0, 50, 550, true));
+    // Generate next chunks
+    generatePlatforms();
+    generatePlatforms();
+}
 
-    // Right Wall
-    platforms.push(new Platform(750, 0, 50, 550, true));
+function generatePlatforms() {
+    let startX = platformGenerator.lastX + platformGenerator.chunkWidth;
+    let endX = startX + platformGenerator.chunkWidth;
 
-    // Middle Platforms
-    platforms.push(new Platform(200, 450, 150, 20));
-    platforms.push(new Platform(450, 350, 150, 20));
-    platforms.push(new Platform(150, 250, 100, 20));
-    platforms.push(new Platform(550, 200, 100, 20));
-    platforms.push(new Platform(350, 150, 150, 20));
+    // Add floor gaps and varied heights
+    let floorX = startX;
+    while (floorX < endX) {
+        let hasGap = Math.random() > 0.7;
+        let pWidth = hasGap ? 150 + Math.random() * 200 : 300 + Math.random() * 300;
+        let pHeight = 50;
+
+        if (!hasGap || floorX === startX) {
+            platforms.push(new Platform(floorX, 550, pWidth, pHeight));
+        }
+
+        // Sometimes spawn a wall obstacle for wall-running
+        if (Math.random() > 0.6) {
+            let wallHeight = 200 + Math.random() * 200;
+            platforms.push(new Platform(floorX + pWidth/2, 550 - wallHeight, 50, wallHeight, true));
+        }
+
+        floorX += pWidth + (hasGap ? 100 + Math.random() * 150 : 0);
+    }
+
+    // Floating platforms
+    for (let i = 0; i < 5; i++) {
+        let fx = startX + Math.random() * platformGenerator.chunkWidth;
+        let fy = 150 + Math.random() * 250;
+        let fw = 80 + Math.random() * 100;
+        platforms.push(new Platform(fx, fy, fw, 20));
+    }
+
+    platformGenerator.lastX = startX;
 }
 
 function initGame() {
@@ -602,9 +776,14 @@ function initGame() {
     gameState.score = 0;
     scoreDisplay.innerText = gameState.score;
     gameOverScreen.style.display = 'none';
+    startScreen.style.display = 'none';
+    uiLayer.style.display = 'flex';
 
     healthBar.style.width = '100%';
     energyBar.style.width = '100%';
+
+    camera.x = 0;
+    camera.y = 0;
 
     initLevel();
     player = new Player(100, 400);
@@ -613,7 +792,7 @@ function initGame() {
     enemies = [];
     enemySpawnTimer = 2.0;
 
-    // Spawn initial enemy
+    // Spawn initial enemy ahead
     enemies.push(new Enemy(600, 100));
 
     gameState.lastTime = performance.now();
@@ -624,6 +803,26 @@ function update(deltaTime) {
     if (!gameState.running) return;
 
     player.update(deltaTime);
+
+    // Update camera to follow player horizontally
+    let targetX = player.x - camera.offset;
+    // Only move camera forward
+    if (targetX > camera.x) {
+        camera.x = targetX;
+    }
+
+    // Procedural generation logic
+    if (camera.x + canvas.width > platformGenerator.lastX) {
+        generatePlatforms();
+    }
+
+    // Clean up old platforms behind camera
+    for (let i = platforms.length - 1; i >= 0; i--) {
+        if (platforms[i].x + platforms[i].width < camera.x - 200) {
+            platforms.splice(i, 1);
+        }
+    }
+
     updateParticles(deltaTime);
 
     // Spawn enemies
@@ -631,9 +830,9 @@ function update(deltaTime) {
     if (enemySpawnTimer <= 0) {
         enemySpawnTimer = enemySpawnRate;
         if (enemies.length < 5) { // Max enemies on screen
-            // Spawn random position (top half)
-            let ex = Math.random() * (canvas.width - 60) + 30;
-            let ey = Math.random() * 200 + 50;
+            // Spawn random position ahead of camera
+            let ex = camera.x + canvas.width + Math.random() * 200;
+            let ey = Math.random() * 300 + 50;
             enemies.push(new Enemy(ex, ey));
         }
     }
@@ -660,6 +859,12 @@ function update(deltaTime) {
     for (let i = projectiles.length - 1; i >= 0; i--) {
         let p = projectiles[i];
         p.update(deltaTime);
+
+        // Remove projectiles far off screen
+        if (p.x < camera.x - 100 || p.x > camera.x + canvas.width + 100) {
+             projectiles.splice(i, 1);
+             continue;
+        }
 
         let removed = false;
 
@@ -709,15 +914,21 @@ function draw(ctx) {
     // Clear screen
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw background grid (cyberpunk style)
+    // Draw background grid (cyberpunk style) with parallax/camera offset
     ctx.strokeStyle = '#112';
     ctx.lineWidth = 1;
-    for(let i=0; i<canvas.width; i+=50) {
+    let offsetX = camera.x % 50;
+
+    for(let i = -offsetX; i < canvas.width; i += 50) {
         ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
     }
-    for(let i=0; i<canvas.height; i+=50) {
+    for(let i = 0; i < canvas.height; i += 50) {
         ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
     }
+
+    // Apply camera transform for world objects
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
 
     // Draw platforms
     platforms.forEach(p => p.draw(ctx));
@@ -726,6 +937,8 @@ function draw(ctx) {
     drawParticles(ctx);
     projectiles.forEach(p => p.draw(ctx));
     if (player) player.draw(ctx);
+
+    ctx.restore();
 }
 
 function gameLoop(timestamp) {
@@ -744,6 +957,9 @@ function gameLoop(timestamp) {
 }
 
 restartBtn.addEventListener('click', initGame);
+startBtn.addEventListener('click', initGame);
 
-// Start game
-initGame();
+// Start game loop but don't init game yet
+gameState.running = false;
+gameState.lastTime = performance.now();
+requestAnimationFrame(gameLoop);

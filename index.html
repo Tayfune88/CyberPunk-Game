@@ -92,41 +92,121 @@
             text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 20px #0ff, 0 0 40px #0ff, 0 0 80px #0ff;
         }
 
-        #game-over-screen {
+        .overlay-screen {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            display: none;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 10;
+            backdrop-filter: blur(5px);
         }
 
-        #game-over-screen h1 {
-            font-size: 48px;
-            margin-bottom: 20px;
-            color: #f00;
-            text-shadow: 0 0 10px #f00, 0 0 20px #f00;
+        #start-screen {
+            background: radial-gradient(circle, rgba(0,0,0,0.4) 0%, rgba(10,10,12,1) 100%);
         }
 
-        #restart-btn {
-            padding: 10px 20px;
-            font-size: 18px;
+        #game-over-screen {
+            display: none;
+        }
+
+        .title-main {
+            font-size: 64px;
+            margin: 0;
+            color: #fff;
+            text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 20px #0ff, 0 0 40px #0ff, 0 0 80px #0ff;
+            letter-spacing: 5px;
+            animation: pulse-neon 2s infinite alternate;
+        }
+
+        .title-sub {
+            font-size: 24px;
+            margin-top: 10px;
+            margin-bottom: 50px;
+            color: #f0f;
+            text-shadow: 0 0 10px #f0f, 0 0 20px #f0f;
+            letter-spacing: 10px;
+        }
+
+        @keyframes pulse-neon {
+            0% { text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 20px #0ff, 0 0 40px #0ff; }
+            100% { text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 20px #0ff, 0 0 40px #0ff, 0 0 80px #0ff, 0 0 100px #0ff; }
+        }
+
+        .cyber-btn {
+            padding: 15px 40px;
+            font-size: 20px;
             background-color: transparent;
             color: #0ff;
             border: 2px solid #0ff;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.2s ease-in-out;
             font-family: inherit;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            position: relative;
+            overflow: hidden;
         }
 
-        #restart-btn:hover {
-            background-color: rgba(0, 255, 255, 0.2);
-            box-shadow: 0 0 10px #0ff;
+        .cyber-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.4), transparent);
+            transition: all 0.4s ease;
+        }
+
+        .cyber-btn:hover::before {
+            left: 100%;
+        }
+
+        .cyber-btn:hover {
+            background-color: rgba(0, 255, 255, 0.1);
+            box-shadow: 0 0 15px #0ff, inset 0 0 10px #0ff;
+            text-shadow: 0 0 5px #0ff;
+        }
+
+        .cyber-btn-danger {
+            color: #f00;
+            border-color: #f00;
+        }
+
+        .cyber-btn-danger::before {
+            background: linear-gradient(90deg, transparent, rgba(255, 0, 0, 0.4), transparent);
+        }
+
+        .cyber-btn-danger:hover {
+            background-color: rgba(255, 0, 0, 0.1);
+            box-shadow: 0 0 15px #f00, inset 0 0 10px #f00;
+            text-shadow: 0 0 5px #f00;
+        }
+
+        #game-over-screen h1 {
+            font-size: 56px;
+            margin-bottom: 20px;
+            color: #f00;
+            text-shadow: 0 0 10px #f00, 0 0 20px #f00, 0 0 40px #f00;
+            letter-spacing: 5px;
+        }
+
+        .loading-text {
+            position: absolute;
+            bottom: 20px;
+            font-size: 14px;
+            color: #555;
+            animation: blink 1s infinite step-end;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
         }
 
     </style>
@@ -134,7 +214,15 @@
 <body>
     <div id="game-container">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
-        <div id="ui-layer">
+
+        <div id="start-screen" class="overlay-screen">
+            <h1 class="title-main">NEON-GHOST</h1>
+            <h2 class="title-sub">PROTOCOL ZERO</h2>
+            <button id="start-btn" class="cyber-btn">INITIALIZE</button>
+            <div class="loading-text">SYSTEM STANDBY...</div>
+        </div>
+
+        <div id="ui-layer" style="display: none;">
             <div>
                 <div class="hud-element" style="font-size: 14px; margin-bottom: 5px;">UNIT 7 [HP]</div>
                 <div class="health-bar-container"><div id="health-bar"></div></div>
@@ -153,10 +241,10 @@
             Left Click: Katana (Melee)<br>
             Right Click: Railgun (Ranged)
         </div>
-        <div id="game-over-screen">
+        <div id="game-over-screen" class="overlay-screen">
             <h1>SYSTEM FAILURE</h1>
-            <p style="font-size: 20px; margin-bottom: 30px;">UNIT 7 OFFLINE</p>
-            <button id="restart-btn">REBOOT PROTOCOL</button>
+            <p style="font-size: 20px; margin-bottom: 30px; color: #aaa; letter-spacing: 2px;">UNIT 7 OFFLINE</p>
+            <button id="restart-btn" class="cyber-btn cyber-btn-danger">REBOOT PROTOCOL</button>
         </div>
     </div>
     <script src="game.js"></script>
