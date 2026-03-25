@@ -886,7 +886,7 @@ function initGame() {
     enemies.push(new Enemy(600, 100));
 
     gameState.lastTime = performance.now();
-    requestAnimationFrame(gameLoop);
+    // The game loop is already running in the background, no need to call requestAnimationFrame again.
 }
 
 function update(deltaTime) {
@@ -1033,6 +1033,8 @@ function draw(ctx) {
 }
 
 function gameLoop(timestamp) {
+    requestAnimationFrame(gameLoop);
+
     if (!gameState.running) return;
 
     gameState.deltaTime = (timestamp - gameState.lastTime) / 1000;
@@ -1043,8 +1045,6 @@ function gameLoop(timestamp) {
 
     update(gameState.deltaTime);
     draw(ctx);
-
-    requestAnimationFrame(gameLoop);
 }
 
 restartBtn.addEventListener('click', initGame);
