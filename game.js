@@ -628,6 +628,7 @@ class Enemy {
         this.width = 35;
         this.height = 35;
         this.hp = 100;
+        this.maxHp = 100;
         this.speed = 100;
         this.color = '#f00';
         this.animTimer = Math.random() * 10;
@@ -723,6 +724,15 @@ class Enemy {
 
         ctx.restore();
         ctx.shadowBlur = 0;
+
+        // Draw Health Bar
+        ctx.fillStyle = '#222';
+        ctx.fillRect(this.x, this.y - 15, this.width, 4);
+        ctx.fillStyle = '#f00';
+        ctx.fillRect(this.x, this.y - 15, this.width * (this.hp / this.maxHp), 4);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(this.x, this.y - 15, this.width, 4);
     }
 
     takeDamage(amount) {
@@ -758,6 +768,7 @@ class MeleeEnemy {
 
         // State
         this.hp = 150;
+        this.maxHp = 150;
         this.facingRight = false;
         this.animTimer = Math.random() * 10;
 
@@ -966,6 +977,15 @@ class MeleeEnemy {
             ctx.fill();
             ctx.shadowBlur = 0;
         }
+
+        // Draw Health Bar
+        ctx.fillStyle = '#222';
+        ctx.fillRect(this.x, this.y - 15, this.width, 4);
+        ctx.fillStyle = '#f50';
+        ctx.fillRect(this.x, this.y - 15, this.width * (this.hp / this.maxHp), 4);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(this.x, this.y - 15, this.width, 4);
     }
 
     takeDamage(amount) {
@@ -1125,7 +1145,7 @@ function initGame() {
     enemies.push(new MeleeEnemy(600, 450));
 
     gameState.lastTime = performance.now();
-    // The game loop is already running in the background, no need to call requestAnimationFrame again.
+    requestAnimationFrame(gameLoop);
 }
 
 function update(deltaTime) {
@@ -1278,9 +1298,11 @@ function draw(ctx) {
 }
 
 function gameLoop(timestamp) {
-    requestAnimationFrame(gameLoop);
-
+    // Only schedule the next frame if the game is running,
+    // to prevent runaway/multiple concurrent loops.
     if (!gameState.running) return;
+
+    requestAnimationFrame(gameLoop);
 
     gameState.deltaTime = (timestamp - gameState.lastTime) / 1000;
     gameState.lastTime = timestamp;
@@ -1295,7 +1317,6 @@ function gameLoop(timestamp) {
 restartBtn.addEventListener('click', initGame);
 startBtn.addEventListener('click', initGame);
 
-// Start game loop but don't init game yet
+// Initialize game state but wait for user to start
 gameState.running = false;
 gameState.lastTime = performance.now();
-requestAnimationFrame(gameLoop);
