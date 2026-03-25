@@ -741,6 +741,244 @@ class Enemy {
     }
 }
 
+class MeleeEnemy {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 30;
+        this.height = 50;
+        this.color = '#f50';
+
+        // Physics
+        this.vx = 0;
+        this.vy = 0;
+        this.speed = 150;
+        this.gravity = 1500;
+        this.grounded = false;
+
+        // State
+        this.hp = 150;
+        this.facingRight = false;
+        this.animTimer = Math.random() * 10;
+
+        // Combat
+        this.isAttacking = false;
+        this.attackTimer = 0;
+        this.attackDuration = 0.4;
+        this.attackCooldown = 1.0;
+        this.attackCooldownTimer = 0;
+        this.attackRange = 60;
+    }
+
+    update(dt) {
+        // AI Logic
+        let dx = player.x - this.x;
+        let dist = Math.abs(dx);
+
+        if (this.attackCooldownTimer > 0) this.attackCooldownTimer -= dt;
+
+        if (this.isAttacking) {
+            this.vx = 0; // Stop moving while attacking
+            this.attackTimer -= dt;
+            if (this.attackTimer <= 0) {
+                this.isAttacking = false;
+                // Deal damage at the end of the swing
+                if (dist < this.attackRange + player.width && Math.sign(dx) === (this.facingRight ? 1 : -1) && Math.abs(player.y - this.y) < 60) {
+                    if (!player.isDashing) {
+                        player.takeDamage(15);
+                        player.vx = this.facingRight ? 300 : -300; // Knockback
+                        createParticles(player.x + player.width/2, player.y + player.height/2, 15, '#f00');
+                    }
+                }
+            }
+        } else {
+            // Chase player if within horizontal range
+            if (dist < 600 && Math.abs(player.y - this.y) < 200) {
+                if (dx > 0) {
+                    this.vx = this.speed;
+                    this.facingRight = true;
+                } else {
+                    this.vx = -this.speed;
+                    this.facingRight = false;
+                }
+
+                // Attack if close enough
+                if (dist < this.attackRange && this.attackCooldownTimer <= 0) {
+                    this.isAttacking = true;
+                    this.attackTimer = this.attackDuration;
+                    this.attackCooldownTimer = this.attackCooldown;
+                }
+            } else {
+                this.vx = 0; // Idle
+            }
+        }
+
+        // Apply Gravity
+        if (!this.grounded) {
+            this.vy += this.gravity * dt;
+        }
+
+        // Animation
+        if (this.vx !== 0) {
+            this.animTimer += dt;
+        }
+
+        // Movement & Collision
+        let moveX = this.vx * dt;
+        let moveY = this.vy * dt;
+
+        this.grounded = false;
+
+        // Horizontal Collision
+        this.x += moveX;
+        for (let p of platforms) {
+            if (AABB(this, p)) {
+                if (moveX > 0) {
+                    this.x = p.x - this.width;
+                } else if (moveX < 0) {
+                    this.x = p.x + p.width;
+                }
+                this.vx = 0;
+            }
+        }
+
+        // Vertical Collision
+        this.y += moveY;
+        for (let p of platforms) {
+            if (AABB(this, p)) {
+                if (moveY > 0) {
+                    this.y = p.y - this.height;
+                    this.grounded = true;
+                    this.vy = 0;
+                } else if (moveY < 0) {
+                    this.y = p.y + p.height;
+                    this.vy = 0;
+                }
+            }
+        }
+
+        // Screen bounds (fall off)
+        if (this.y > canvas.height + 200) {
+            this.takeDamage(1000);
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x + this.width/2, this.y + this.height/2);
+
+        if (!this.facingRight) {
+            ctx.scale(-1, 1);
+        }
+
+        let runBob = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 15) * 3 : 0;
+
+        // Body
+        ctx.fillStyle = '#211';
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-10, -15 + runBob);
+        ctx.lineTo(10, -15 + runBob);
+        ctx.lineTo(8, 5 + runBob);
+        ctx.lineTo(-8, 5 + runBob);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Head
+        ctx.beginPath();
+        ctx.arc(0, -22 + runBob, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Glowing Eye
+        ctx.fillStyle = '#f00';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#f00';
+        ctx.fillRect(2, -24 + runBob, 6, 3);
+        ctx.shadowBlur = 0;
+
+        // Sword Arm
+        ctx.save();
+        ctx.translate(5, -10 + runBob);
+
+        if (this.isAttacking) {
+            let swingProg = 1 - (this.attackTimer / this.attackDuration);
+            ctx.rotate(-Math.PI * 0.8 + swingProg * Math.PI * 1.5);
+        } else if (Math.abs(this.vx) > 10 && this.grounded) {
+            ctx.rotate(Math.PI * 0.2 + Math.sin(this.animTimer * 15) * 0.3);
+        } else {
+            ctx.rotate(-Math.PI * 0.3);
+        }
+
+        ctx.fillStyle = '#322';
+        ctx.fillRect(0, -3, 15, 6);
+
+        // Enemy Sword
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#f50';
+        ctx.fillStyle = '#f50';
+        ctx.beginPath();
+        ctx.moveTo(15, -2);
+        ctx.lineTo(45, -4);
+        ctx.lineTo(50, 0);
+        ctx.lineTo(45, 4);
+        ctx.lineTo(15, 2);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.moveTo(16, -1);
+        ctx.lineTo(44, -2);
+        ctx.lineTo(47, 0);
+        ctx.lineTo(44, 2);
+        ctx.lineTo(16, 1);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
+
+        // Legs
+        let legSwing = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 15) * 10 : 0;
+        ctx.strokeStyle = this.color;
+        ctx.beginPath(); ctx.moveTo(-4, 5 + runBob); ctx.lineTo(-4 - legSwing, 25); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(4, 5 + runBob); ctx.lineTo(4 + legSwing, 25); ctx.stroke();
+
+        ctx.restore();
+
+        // Attack Hitbox visualization
+        if (this.isAttacking) {
+            ctx.fillStyle = 'rgba(255, 80, 0, 0.4)';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#f50';
+            let swingProg = 1 - (this.attackTimer / this.attackDuration);
+
+            ctx.beginPath();
+            if (this.facingRight) {
+                ctx.arc(this.x + this.width/2, this.y + this.height/2, this.attackRange, -Math.PI/2, -Math.PI/2 + swingProg * Math.PI, false);
+            } else {
+                ctx.arc(this.x + this.width/2, this.y + this.height/2, this.attackRange, -Math.PI/2, -Math.PI/2 - swingProg * Math.PI, true);
+            }
+            ctx.lineTo(this.x + this.width/2, this.y + this.height/2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    takeDamage(amount) {
+        this.hp -= amount;
+        if (this.hp <= 0) {
+            createParticles(this.x + this.width/2, this.y + this.height/2, 40, this.color);
+            gameState.score += 150;
+            scoreDisplay.innerText = gameState.score;
+            this.dead = true;
+        }
+    }
+}
+
 let enemySpawnTimer = 0;
 const enemySpawnRate = 3.0; // seconds
 
@@ -803,8 +1041,9 @@ function generatePlatforms() {
     // Add floor gaps and varied heights
     let floorX = startX;
     while (floorX < endX) {
-        let hasGap = Math.random() > 0.7;
-        let pWidth = hasGap ? 150 + Math.random() * 200 : 300 + Math.random() * 300;
+        // Significantly reduce gaps
+        let hasGap = Math.random() > 0.9;
+        let pWidth = hasGap ? 150 + Math.random() * 200 : 300 + Math.random() * 500;
         let pHeight = 50;
 
         if (!hasGap || floorX === startX) {
@@ -883,7 +1122,7 @@ function initGame() {
     enemySpawnTimer = 2.0;
 
     // Spawn initial enemy ahead
-    enemies.push(new Enemy(600, 100));
+    enemies.push(new MeleeEnemy(600, 450));
 
     gameState.lastTime = performance.now();
     // The game loop is already running in the background, no need to call requestAnimationFrame again.
@@ -921,10 +1160,16 @@ function update(deltaTime) {
     if (enemySpawnTimer <= 0) {
         enemySpawnTimer = enemySpawnRate;
         if (enemies.length < 5) { // Max enemies on screen
-            // Spawn random position ahead of camera
             let ex = camera.x + canvas.width + Math.random() * 200;
-            let ey = Math.random() * 300 + 50;
-            enemies.push(new Enemy(ex, ey));
+
+            // 80% chance for Melee Enemy, 20% chance for Drone
+            if (Math.random() < 0.8) {
+                let ey = 300; // Spawn higher up so they fall onto a platform
+                enemies.push(new MeleeEnemy(ex, ey));
+            } else {
+                let ey = Math.random() * 300 + 50;
+                enemies.push(new Enemy(ex, ey)); // Drone
+            }
         }
     }
 
@@ -934,7 +1179,7 @@ function update(deltaTime) {
         enemy.update(deltaTime);
 
         // Check collision with player
-        if (AABB(player, enemy) && !player.isDashing) {
+        if (enemy instanceof Enemy && AABB(player, enemy) && !player.isDashing) {
             player.takeDamage(5); // Collision damage
             // Push player back slightly
             let dx = player.x - enemy.x;
