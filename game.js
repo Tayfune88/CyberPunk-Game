@@ -359,16 +359,15 @@ class Player {
         if (this.y > canvas.height) {
             this.takeDamage(100); // Fall off screen
         }
-        // Left bound relative to camera
-        if (this.x < camera.x) {
-            this.x = camera.x;
+        // Left bound relative to start of level
+        if (this.x < 0) {
+            this.x = 0;
             this.vx = 0;
         }
         // Right bound prevents player from moving out of right view
-        if (this.x > camera.x + canvas.width - this.width) {
-            this.x = camera.x + canvas.width - this.width;
-            this.vx = 0;
-        }
+        // Optional: Keep right bound but make it relative to canvas width?
+        // Actually, since camera follows player, we shouldn't restrict player by camera.
+
     }
 
     draw(ctx) {
@@ -897,10 +896,11 @@ function update(deltaTime) {
 
     // Update camera to follow player horizontally
     let targetX = player.x - camera.offset;
-    // Only move camera forward
-    if (targetX > camera.x) {
-        camera.x = targetX;
-    }
+    // Allow moving camera in both directions
+    camera.x += (targetX - camera.x) * 0.1; // Smooth following
+
+    // Optional: prevent camera from going before start
+    if (camera.x < 0) camera.x = 0;
 
     // Procedural generation logic
     if (camera.x + canvas.width > platformGenerator.lastX) {
@@ -909,7 +909,7 @@ function update(deltaTime) {
 
     // Clean up old platforms behind camera
     for (let i = platforms.length - 1; i >= 0; i--) {
-        if (platforms[i].x + platforms[i].width < camera.x - 200) {
+        if (platforms[i].x + platforms[i].width < camera.x - 3000) {
             platforms.splice(i, 1);
         }
     }
