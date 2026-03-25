@@ -378,36 +378,65 @@ class Player {
             ctx.scale(-1, 1);
         }
 
-        ctx.shadowBlur = this.isDashing ? 20 : 10;
-        ctx.shadowColor = this.isDashing ? '#fff' : this.color;
+        // Only glow when dashing
+        ctx.shadowBlur = this.isDashing ? 15 : 0;
+        ctx.shadowColor = this.isDashing ? '#fff' : 'transparent';
 
-        // --- Draw Cyborg Warrior ---
+        // --- Draw Cyborg Warrior (Geometric Design) ---
         let runBob = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 20) * 3 : 0;
+        let lean = this.vx !== 0 && this.grounded ? (this.vx > 0 ? 0.1 : -0.1) : 0;
+        if (!this.facingRight && lean !== 0) lean = -lean; // Adjust lean for facing direction
 
-        // Torso
-        ctx.fillStyle = '#111';
-        ctx.strokeStyle = this.isDashing ? '#fff' : this.color;
-        ctx.lineWidth = 2;
+        ctx.rotate(lean);
+
+        // Core Torso Armor
+        ctx.fillStyle = '#1a1a1a'; // Dark grey armor
+        ctx.strokeStyle = this.isDashing ? '#fff' : '#333';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(-10, -15 + runBob);
-        ctx.lineTo(10, -15 + runBob);
-        ctx.lineTo(8, 5 + runBob);
-        ctx.lineTo(-8, 5 + runBob);
+        ctx.moveTo(-12, -18 + runBob); // Top left shoulder
+        ctx.lineTo(12, -18 + runBob);  // Top right shoulder
+        ctx.lineTo(8, 4 + runBob);    // Bottom right waist
+        ctx.lineTo(-8, 4 + runBob);   // Bottom left waist
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // Head/Helmet
+        // Chest Plate Accent
+        ctx.fillStyle = '#222';
         ctx.beginPath();
-        ctx.arc(0, -22 + runBob, 8, 0, Math.PI * 2);
+        ctx.moveTo(-6, -14 + runBob);
+        ctx.lineTo(6, -14 + runBob);
+        ctx.lineTo(4, -2 + runBob);
+        ctx.lineTo(-4, -2 + runBob);
+        ctx.closePath();
+        ctx.fill();
+
+        // Glowing Neon Spine/Core
+        ctx.fillStyle = this.color;
+        ctx.shadowBlur = this.isDashing ? 20 : 5;
+        ctx.shadowColor = this.color;
+        ctx.fillRect(-1, -12 + runBob, 2, 10);
+        ctx.shadowBlur = 0; // Reset glow for other parts
+
+        // Cybernetic Helmet
+        ctx.fillStyle = '#111';
+        ctx.strokeStyle = '#444';
+        ctx.beginPath();
+        ctx.moveTo(-8, -20 + runBob);
+        ctx.lineTo(8, -20 + runBob);
+        ctx.lineTo(6, -30 + runBob);
+        ctx.lineTo(-6, -30 + runBob);
+        ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // Visor (Neon Eye)
+        // Visor (Neon Slit)
         ctx.fillStyle = '#fff';
-        ctx.shadowBlur = 15;
-        ctx.fillRect(2, -24 + runBob, 6, 3);
-        ctx.shadowBlur = this.isDashing ? 20 : 10;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        ctx.fillRect(0, -28 + runBob, 9, 4); // Wider, asymmetrical visor
+        ctx.shadowBlur = 0;
 
         // Gun Arm (Front/Right) - Heavy Magnum
         let armAngle = 0;
@@ -424,17 +453,17 @@ class Player {
         ctx.translate(5, -10 + runBob);
         ctx.rotate(armAngle);
 
-        // Upper arm
-        ctx.fillStyle = '#222';
-        ctx.fillRect(0, -3, 8, 6);
+        // Cyber Arm (Shoulder & Bicep)
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(-2, -4, 10, 8);
 
-        // Magnum Barrel
-        ctx.fillStyle = '#111';
-        ctx.fillRect(8, -4, 12, 5);
+        // Forearm / Gun Integration
+        ctx.fillStyle = '#151515';
+        ctx.fillRect(8, -5, 14, 7);
 
-        // Magnum Underbarrel/Laser sight
+        // Gun Accents
         ctx.fillStyle = '#333';
-        ctx.fillRect(10, 1, 8, 3);
+        ctx.fillRect(12, 2, 8, 3);
 
         // Neon details
         ctx.strokeStyle = '#f0f'; // Railgun accent
@@ -466,17 +495,21 @@ class Player {
             ctx.rotate(-Math.PI * 0.4);
         }
 
-        // Arm holding sword
-        ctx.fillStyle = '#222';
-        ctx.fillRect(0, -3, 15, 6);
+        // Left Cyber Arm (Melee)
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(-2, -4, 12, 8);
 
-        // Cyber Sword Handle
+        // Forearm
+        ctx.fillStyle = '#151515';
+        ctx.fillRect(10, -3, 8, 6);
+
+        // Sword Grip
         ctx.fillStyle = '#111';
-        ctx.fillRect(15, -4, 10, 8);
+        ctx.fillRect(18, -4, 8, 8);
 
-        // Cyber Sword Crossguard
+        // Crossguard
         ctx.fillStyle = '#444';
-        ctx.fillRect(23, -8, 4, 16);
+        ctx.fillRect(26, -9, 4, 18);
 
         // Giant Neon Blade
         ctx.shadowBlur = 20;
@@ -505,16 +538,34 @@ class Player {
 
         ctx.restore();
 
-        // Legs
-        let legSwing = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 20) * 10 : 0;
-        let legSpread = this.grounded ? 0 : 5;
+        // Cybernetic Legs (Thick, geometric)
+        let legSwing = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 20) * 12 : 0;
+        let legSpread = this.grounded ? 0 : 8;
         if (this.onWall) { legSwing = 0; legSpread = 0; }
 
-        ctx.strokeStyle = this.isDashing ? '#fff' : this.color;
-        // Back leg
-        ctx.beginPath(); ctx.moveTo(-4, 5 + runBob); ctx.lineTo(-4 - legSwing - legSpread, 25); ctx.stroke();
-        // Front leg
-        ctx.beginPath(); ctx.moveTo(4, 5 + runBob); ctx.lineTo(4 + legSwing + legSpread, 25); ctx.stroke();
+        // Back Leg (Darker)
+        ctx.fillStyle = '#1a1a1a';
+        ctx.beginPath();
+        ctx.moveTo(-6, 4 + runBob);
+        ctx.lineTo(-2, 4 + runBob);
+        ctx.lineTo(-2 - legSwing - legSpread, 26);
+        ctx.lineTo(-8 - legSwing - legSpread, 26);
+        ctx.closePath();
+        ctx.fill();
+
+        // Front Leg (Lighter)
+        ctx.fillStyle = '#2a2a2a';
+        ctx.beginPath();
+        ctx.moveTo(2, 4 + runBob);
+        ctx.lineTo(8, 4 + runBob);
+        ctx.lineTo(8 + legSwing + legSpread, 26);
+        ctx.lineTo(2 + legSwing + legSpread, 26);
+        ctx.closePath();
+        ctx.fill();
+
+        // Neon Accents on legs
+        ctx.fillStyle = this.color;
+        ctx.fillRect(4 + legSwing + legSpread, 15, 2, 8);
 
         ctx.restore(); // Restore facing right transform
         ctx.shadowBlur = 0;
@@ -882,37 +933,68 @@ class MeleeEnemy {
             ctx.scale(-1, 1);
         }
 
-        let runBob = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 15) * 3 : 0;
+        ctx.shadowBlur = 0; // Disable global glow to prevent ghosting
 
-        // Body
-        ctx.fillStyle = '#211';
-        ctx.strokeStyle = this.color;
-        ctx.lineWidth = 2;
+        let runBob = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 15) * 3 : 0;
+        let lean = this.vx !== 0 && this.grounded ? (this.vx > 0 ? 0.1 : -0.1) : 0;
+        if (!this.facingRight && lean !== 0) lean = -lean;
+
+        ctx.rotate(lean);
+
+        // Core Torso Armor
+        ctx.fillStyle = '#211'; // Dark red/brown armor
+        ctx.strokeStyle = '#422';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(-10, -15 + runBob);
-        ctx.lineTo(10, -15 + runBob);
-        ctx.lineTo(8, 5 + runBob);
-        ctx.lineTo(-8, 5 + runBob);
+        ctx.moveTo(-12, -18 + runBob);
+        ctx.lineTo(12, -18 + runBob);
+        ctx.lineTo(9, 5 + runBob);
+        ctx.lineTo(-9, 5 + runBob);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // Head
+        // Chest Plate Accent
+        ctx.fillStyle = '#311';
         ctx.beginPath();
-        ctx.arc(0, -22 + runBob, 8, 0, Math.PI * 2);
+        ctx.moveTo(-7, -14 + runBob);
+        ctx.lineTo(7, -14 + runBob);
+        ctx.lineTo(5, -2 + runBob);
+        ctx.lineTo(-5, -2 + runBob);
+        ctx.closePath();
+        ctx.fill();
+
+        // Glowing Core
+        ctx.fillStyle = '#f00';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#f00';
+        ctx.beginPath();
+        ctx.arc(0, -8 + runBob, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Blocky Helmet
+        ctx.fillStyle = '#1a0d0d';
+        ctx.strokeStyle = '#522';
+        ctx.beginPath();
+        ctx.moveTo(-9, -19 + runBob);
+        ctx.lineTo(9, -19 + runBob);
+        ctx.lineTo(7, -32 + runBob);
+        ctx.lineTo(-7, -32 + runBob);
+        ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // Glowing Eye
+        // Glowing Visor
         ctx.fillStyle = '#f00';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 12;
         ctx.shadowColor = '#f00';
-        ctx.fillRect(2, -24 + runBob, 6, 3);
+        ctx.fillRect(2, -28 + runBob, 6, 5); // Aggressive single eye slot
         ctx.shadowBlur = 0;
 
-        // Sword Arm
+        // Sword Arm (Thicker, armored)
         ctx.save();
-        ctx.translate(5, -10 + runBob);
+        ctx.translate(6, -12 + runBob);
 
         if (this.isAttacking) {
             let swingProg = 1 - (this.attackTimer / this.attackDuration);
@@ -923,8 +1005,13 @@ class MeleeEnemy {
             ctx.rotate(-Math.PI * 0.3);
         }
 
-        ctx.fillStyle = '#322';
-        ctx.fillRect(0, -3, 15, 6);
+        // Upper Arm
+        ctx.fillStyle = '#3a1a1a';
+        ctx.fillRect(-2, -4, 12, 8);
+
+        // Forearm
+        ctx.fillStyle = '#2a0a0a';
+        ctx.fillRect(10, -3, 10, 6);
 
         // Enemy Sword
         ctx.shadowBlur = 15;
@@ -952,11 +1039,28 @@ class MeleeEnemy {
 
         ctx.restore();
 
-        // Legs
-        let legSwing = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 15) * 10 : 0;
-        ctx.strokeStyle = this.color;
-        ctx.beginPath(); ctx.moveTo(-4, 5 + runBob); ctx.lineTo(-4 - legSwing, 25); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(4, 5 + runBob); ctx.lineTo(4 + legSwing, 25); ctx.stroke();
+        // Cyber Legs (Geometric)
+        let legSwing = this.grounded && Math.abs(this.vx) > 10 ? Math.sin(this.animTimer * 15) * 12 : 0;
+
+        // Back Leg
+        ctx.fillStyle = '#221111';
+        ctx.beginPath();
+        ctx.moveTo(-7, 5 + runBob);
+        ctx.lineTo(-3, 5 + runBob);
+        ctx.lineTo(-3 - legSwing, 25);
+        ctx.lineTo(-9 - legSwing, 25);
+        ctx.closePath();
+        ctx.fill();
+
+        // Front Leg
+        ctx.fillStyle = '#3a1a1a';
+        ctx.beginPath();
+        ctx.moveTo(3, 5 + runBob);
+        ctx.lineTo(9, 5 + runBob);
+        ctx.lineTo(9 + legSwing, 25);
+        ctx.lineTo(3 + legSwing, 25);
+        ctx.closePath();
+        ctx.fill();
 
         ctx.restore();
 
