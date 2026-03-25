@@ -169,8 +169,8 @@ class Player {
         // Combat
         this.isAttackingMelee = false;
         this.meleeTimer = 0;
-        this.meleeDuration = 0.2;
-        this.meleeCooldown = 0.4;
+        this.meleeDuration = 0.3; // Slower, heavier swing
+        this.meleeCooldown = 0.5;
         this.meleeCooldownTimer = 0;
 
         this.rangedCooldown = 0.5;
@@ -410,45 +410,100 @@ class Player {
         ctx.fillRect(2, -24 + runBob, 6, 3);
         ctx.shadowBlur = this.isDashing ? 20 : 10;
 
-        // Gun Arm (Front/Right)
+        // Gun Arm (Front/Right) - Heavy Magnum
         let armAngle = 0;
+        // Aiming slightly based on mouse, but default to forward
         if (!this.grounded) armAngle = -0.5;
         if (this.onWall) armAngle = -1.5;
+
+        // Add recoil if recently fired
+        if (this.rangedCooldownTimer > this.rangedCooldown - 0.1) {
+            armAngle -= 0.5; // Kick upward
+        }
 
         ctx.save();
         ctx.translate(5, -10 + runBob);
         ctx.rotate(armAngle);
+
+        // Upper arm
         ctx.fillStyle = '#222';
-        ctx.fillRect(0, -2, 15, 4);
+        ctx.fillRect(0, -3, 8, 6);
+
+        // Magnum Barrel
+        ctx.fillStyle = '#111';
+        ctx.fillRect(8, -4, 12, 5);
+
+        // Magnum Underbarrel/Laser sight
+        ctx.fillStyle = '#333';
+        ctx.fillRect(10, 1, 8, 3);
+
+        // Neon details
         ctx.strokeStyle = '#f0f'; // Railgun accent
-        ctx.strokeRect(0, -2, 15, 4);
+        ctx.lineWidth = 1;
+        ctx.strokeRect(8, -4, 12, 5);
+
+        // Muzzle flash / glowing tip
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#f0f';
+        ctx.fillStyle = '#f0f';
+        ctx.fillRect(20, -3, 2, 3);
+        ctx.shadowBlur = 0;
+
         ctx.restore();
 
-        // Sword Arm (Back/Left)
+        // Sword Arm (Back/Left) - Big Cyber Sword
         ctx.save();
         ctx.translate(-5, -10 + runBob);
+
         if (this.isAttackingMelee) {
             let swingProg = 1 - (this.meleeTimer / this.meleeDuration);
-            ctx.rotate(-Math.PI/2 + swingProg * Math.PI);
+            // Heavy downward slam arc: starts high behind, ends low in front
+            ctx.rotate(-Math.PI * 0.8 + swingProg * Math.PI * 1.5);
         } else if (Math.abs(this.vx) > 10 && this.grounded) {
-            ctx.rotate(Math.sin(this.animTimer * 20) * 0.5); // Running swing
+            // Dragging/running pose
+            ctx.rotate(Math.PI * 0.2 + Math.sin(this.animTimer * 20) * 0.2);
         } else {
-            ctx.rotate(0.5); // Idle pose
+            // Idle resting pose on shoulder
+            ctx.rotate(-Math.PI * 0.4);
         }
 
-        // Arm
+        // Arm holding sword
         ctx.fillStyle = '#222';
-        ctx.fillRect(0, -2, 12, 4);
+        ctx.fillRect(0, -3, 15, 6);
 
-        // Katana Blade
-        ctx.shadowColor = '#f50';
-        ctx.fillStyle = '#f50';
+        // Cyber Sword Handle
+        ctx.fillStyle = '#111';
+        ctx.fillRect(15, -4, 10, 8);
+
+        // Cyber Sword Crossguard
+        ctx.fillStyle = '#444';
+        ctx.fillRect(23, -8, 4, 16);
+
+        // Giant Neon Blade
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#0f0'; // Neon Green for contrast
+        ctx.fillStyle = '#0f0';
         ctx.beginPath();
-        ctx.moveTo(12, -1);
-        ctx.lineTo(35, -2);
-        ctx.lineTo(38, 0);
-        ctx.lineTo(12, 1);
+        ctx.moveTo(27, -4); // Bottom edge
+        ctx.lineTo(65, -6); // Tip bottom
+        ctx.lineTo(70, -2); // Tip point
+        ctx.lineTo(60, 4);  // Tip top
+        ctx.lineTo(27, 2);  // Top edge
+        ctx.closePath();
         ctx.fill();
+
+        // Inner bright core of the blade
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.moveTo(28, -2);
+        ctx.lineTo(64, -3);
+        ctx.lineTo(66, -1);
+        ctx.lineTo(58, 1);
+        ctx.lineTo(28, 0);
+        ctx.closePath();
+        ctx.fill();
+
         ctx.restore();
 
         // Legs
@@ -465,27 +520,33 @@ class Player {
         ctx.restore(); // Restore facing right transform
         ctx.shadowBlur = 0;
 
-        // Draw Melee Hitbox swoosh
+        // Draw Heavy Melee Hitbox swoosh
         if (this.isAttackingMelee && !this.isDashing) {
-            ctx.fillStyle = 'rgba(255, 100, 0, 0.7)';
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#f50';
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#0f0';
 
-            let hitboxWidth = 50;
-            let hitboxHeight = 40;
+            let hitboxWidth = 70; // Larger hitbox for big sword
+            let hitboxHeight = 80;
             let hx = this.facingRight ? this.x + this.width : this.x - hitboxWidth;
             let hy = this.y + this.height/2 - hitboxHeight/2;
 
-            // Swoosh arc
+            // Big crescent slash
             ctx.beginPath();
-            ctx.moveTo(this.facingRight ? this.x + this.width : this.x, this.y + this.height/2);
+            ctx.moveTo(this.facingRight ? this.x + this.width/2 : this.x + this.width/2, this.y - 20);
+
             if(this.facingRight) {
-                ctx.quadraticCurveTo(hx + hitboxWidth, hy, hx + hitboxWidth, hy + hitboxHeight);
+                ctx.bezierCurveTo(hx + hitboxWidth + 20, hy - 30, hx + hitboxWidth + 20, hy + hitboxHeight + 30, this.x + this.width/2, this.y + this.height + 20);
+                ctx.bezierCurveTo(hx + hitboxWidth, hy + hitboxHeight, hx + hitboxWidth, hy, this.x + this.width/2, this.y);
             } else {
-                ctx.quadraticCurveTo(hx, hy, hx, hy + hitboxHeight);
+                ctx.bezierCurveTo(hx - 20, hy - 30, hx - 20, hy + hitboxHeight + 30, this.x + this.width/2, this.y + this.height + 20);
+                ctx.bezierCurveTo(hx, hy + hitboxHeight, hx, hy, this.x + this.width/2, this.y);
             }
-            ctx.strokeStyle = '#f50';
-            ctx.lineWidth = 3;
+
+            ctx.fill();
+
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 4;
             ctx.stroke();
 
             ctx.shadowBlur = 0;
@@ -543,8 +604,8 @@ class Projectile {
 }
 
 function checkMeleeHit(player) {
-    let hitboxWidth = 50;
-    let hitboxHeight = 40;
+    let hitboxWidth = 70; // Match new visual size
+    let hitboxHeight = 80;
     let hx = player.facingRight ? player.x + player.width : player.x - hitboxWidth;
     let hy = player.y + player.height/2 - hitboxHeight/2;
 
@@ -751,21 +812,51 @@ function generatePlatforms() {
             platforms.push(new Platform(floorX, 550, pWidth, pHeight));
         }
 
+        let spawnedWall = false;
+
         // Sometimes spawn a wall obstacle for wall-running
         if (Math.random() > 0.6) {
-            let wallHeight = 200 + Math.random() * 200;
-            platforms.push(new Platform(floorX + pWidth/2, 550 - wallHeight, 50, wallHeight, true));
+            // Varying wall heights that are traversable
+            let wallHeight = 150 + Math.random() * 150;
+            // Position wall in middle of platform, ensuring enough space to jump on both sides
+            let wallX = floorX + pWidth/2 - 25;
+            platforms.push(new Platform(wallX, 550 - wallHeight, 50, wallHeight, true));
+            spawnedWall = true;
         }
 
-        floorX += pWidth + (hasGap ? 100 + Math.random() * 150 : 0);
+        floorX += pWidth + (hasGap ? 150 + Math.random() * 150 : 0); // Slightly wider gaps for better flow
     }
 
     // Floating platforms
-    for (let i = 0; i < 5; i++) {
-        let fx = startX + Math.random() * platformGenerator.chunkWidth;
-        let fy = 150 + Math.random() * 250;
+    let floatAttempts = 0;
+    let floatsCreated = 0;
+    while (floatsCreated < 4 && floatAttempts < 20) {
+        floatAttempts++;
+        let fx = startX + Math.random() * (platformGenerator.chunkWidth - 100);
+        let fy = 150 + Math.random() * 200;
         let fw = 80 + Math.random() * 100;
-        platforms.push(new Platform(fx, fy, fw, 20));
+
+        let valid = true;
+        let newFloat = new Platform(fx, fy, fw, 20);
+
+        // Check if platform is directly above a wall obstacle, which would trap the player
+        for (let p of platforms) {
+            if (p.isWall) {
+                // If horizontal bounds overlap
+                if (newFloat.x < p.x + p.width && newFloat.x + newFloat.width > p.x) {
+                    // And if float is directly above wall (with not enough clearance)
+                    if (newFloat.y < p.y && newFloat.y > p.y - 150) {
+                        valid = false;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (valid) {
+            platforms.push(newFloat);
+            floatsCreated++;
+        }
     }
 
     platformGenerator.lastX = startX;
