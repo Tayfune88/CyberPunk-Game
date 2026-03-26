@@ -16,8 +16,59 @@ let gameState = {
     lastTime: 0,
     gravity: 0.8,
     friction: 0.8,
-    deltaTime: 0
+    deltaTime: 0,
+    playerName: 'UNKNOWN',
+    startTime: 0,
+    topScore: 0,
+    fireworksTriggered: false
 };
+
+// Highscore Functions
+function loadHighscores() {
+    let scores = localStorage.getItem('neonGhostHighscores');
+    if (scores) {
+        return JSON.parse(scores);
+    }
+    return [];
+}
+
+function saveHighscore(name, score, survivalTime) {
+    let scores = loadHighscores();
+    scores.push({ name: name, score: score, time: survivalTime });
+    // Sort descending by score, then ascending by time (less time is better for same score? Actually maybe more time is better, let's just sort by score descending)
+    scores.sort((a, b) => b.score - a.score);
+    // Keep top 20
+    scores = scores.slice(0, 20);
+    localStorage.setItem('neonGhostHighscores', JSON.stringify(scores));
+}
+
+function updateHighscoreUI() {
+    const tableBody = document.querySelector('#highscore-table tbody');
+    if (!tableBody) return;
+
+    let scores = loadHighscores();
+    tableBody.innerHTML = '';
+
+    if (scores.length > 0) {
+        gameState.topScore = scores[0].score;
+    } else {
+        gameState.topScore = 0;
+    }
+
+    scores.forEach((entry, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${entry.name}</td>
+            <td>${entry.score}</td>
+            <td>${entry.time}s</td>
+        `;
+        tableBody.appendChild(row);
+    });
+}
+
+// Initial Highscore Load
+updateHighscoreUI();
 
 // Camera
 let camera = {
@@ -628,8 +679,11 @@ class Player {
     takeDamage(amount) {
         this.hp -= amount;
         healthBar.style.width = Math.max(0, (this.hp / this.maxHp) * 100) + '%';
-        if (this.hp <= 0) {
+        if (this.hp <= 0 && gameState.running) {
             gameState.running = false;
+            let survivalTime = Math.floor((Date.now() - gameState.startTime) / 1000);
+            saveHighscore(gameState.playerName, gameState.score, survivalTime);
+            updateHighscoreUI();
             gameOverScreen.style.display = 'flex';
         }
     }
@@ -841,6 +895,21 @@ function createParticles(x, y, count, color) {
     }
 }
 
+function createFirework(x, y) {
+    const colors = ['#f00', '#0f0', '#00f', '#ff0', '#f0f', '#0ff', '#fff'];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    for (let i = 0; i < 50; i++) {
+        particles.push({
+            x: x,
+            y: y,
+            vx: (Math.random() - 0.5) * 400,
+            vy: (Math.random() - 0.5) * 400 - 100, // slight upward bias
+            life: 1.5 + Math.random(), // 1.5 to 2.5 seconds
+            color: color
+        });
+    }
+}
+
 function updateParticles(dt) {
     for (let i = particles.length - 1; i >= 0; i--) {
         let p = particles[i];
@@ -949,6 +1018,14 @@ function generatePlatforms() {
 function initGame() {
     gameState.running = true;
     gameState.score = 0;
+
+    // Highscore initialization
+    let nameInput = document.getElementById('player-name-input');
+    gameState.playerName = nameInput.value.trim() !== '' ? nameInput.value.trim().toUpperCase() : 'UNKNOWN';
+    gameState.startTime = Date.now();
+    gameState.fireworksTriggered = false;
+    updateHighscoreUI(); // refresh topScore
+
     scoreDisplay.innerText = gameState.score;
     gameOverScreen.style.display = 'none';
     startScreen.style.display = 'none';
@@ -986,6 +1063,19 @@ function update(deltaTime) {
 
     // Optional: prevent camera from going before start
     if (camera.x < 0) camera.x = 0;
+
+    // Fireworks trigger when beating top score
+    if (gameState.topScore > 0 && gameState.score > gameState.topScore && !gameState.fireworksTriggered) {
+        gameState.fireworksTriggered = true;
+        // Spawn a burst of fireworks across the screen
+        for (let i = 0; i < 5; i++) {
+            setTimeout(() => {
+                let fwX = camera.x + 100 + Math.random() * (canvas.width - 200);
+                let fwY = 100 + Math.random() * 200;
+                createFirework(fwX, fwY);
+            }, i * 300); // cascade effect
+        }
+    }
 
     // Procedural generation logic
     if (camera.x + canvas.width > platformGenerator.lastX) {

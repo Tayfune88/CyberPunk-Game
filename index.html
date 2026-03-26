@@ -231,6 +231,75 @@
             padding-bottom: 10px;
         }
 
+        .cyber-input {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: #0ff;
+            border: 1px solid #0ff;
+            font-family: inherit;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            outline: none;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2) inset;
+            transition: all 0.2s;
+        }
+
+        .cyber-input:focus {
+            box-shadow: 0 0 15px #0ff inset, 0 0 10px #0ff;
+        }
+
+        .highscore-container {
+            margin-top: 20px;
+            flex-grow: 1;
+            overflow-y: auto;
+            border: 1px solid #333;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+        }
+
+        .highscore-container::-webkit-scrollbar {
+            width: 5px;
+        }
+        .highscore-container::-webkit-scrollbar-thumb {
+            background: #0ff;
+        }
+
+        #highscore-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            text-align: left;
+        }
+
+        #highscore-table th {
+            color: #f0f;
+            border-bottom: 1px solid #f0f;
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+            text-shadow: 0 0 5px #f0f;
+        }
+
+        #highscore-table td {
+            padding: 4px 0;
+            color: #aaa;
+        }
+
+        #highscore-table tr:nth-child(1) td {
+            color: #ff0;
+            text-shadow: 0 0 5px #ff0;
+            font-weight: bold;
+        }
+
+        #highscore-table tr:nth-child(2) td {
+            color: #ddd;
+        }
+
+        #highscore-table tr:nth-child(3) td {
+            color: #b87333;
+        }
+
     </style>
 </head>
 <body>
@@ -240,6 +309,7 @@
         <div id="start-screen" class="overlay-screen">
             <h1 class="title-main">NEON-GHOST</h1>
             <h2 class="title-sub">PROTOCOL ZERO</h2>
+            <input type="text" id="player-name-input" placeholder="ENTER NAME" class="cyber-input" style="margin-bottom: 20px;">
             <button id="start-btn" class="cyber-btn">INITIALIZE</button>
             <div class="loading-text">SYSTEM STANDBY...</div>
         </div>
@@ -271,6 +341,22 @@
             Shift: Phase-Dash<br>
             Space: Katana (Melee)<br>
             Left Click: Railgun (Ranged)
+        </div>
+        <div class="highscore-container">
+            <h2 style="font-size: 16px; margin-bottom: 10px;">TOP 20 OPERATORS</h2>
+            <table id="highscore-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%">#</th>
+                        <th style="width: 40%">NAME</th>
+                        <th style="width: 25%">SCORE</th>
+                        <th style="width: 20%">TIME</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Highscores will be populated here -->
+                </tbody>
+            </table>
         </div>
     </div>
     <script src="game.js"></script>
