@@ -129,16 +129,6 @@ class Platform {
     }
 }
 
-// Basic Box Collision
-function AABB(rect1, rect2) {
-    return (
-        rect1.x < rect2.x + rect2.width &&
-        rect1.x + rect1.width > rect2.x &&
-        rect1.y < rect2.y + rect2.height &&
-        rect1.y + rect1.height > rect2.y
-    );
-}
-
 class Player {
     constructor(x, y) {
         this.x = x;
@@ -260,13 +250,11 @@ class Player {
             }
 
             // Apply Gravity
-            if (!this.grounded) {
-                if (this.onWall && this.vy > 0) {
-                    // Wall slide
-                    this.vy = this.wallSlideSpeed;
-                } else {
-                    this.vy += this.gravity * dt;
-                }
+            if (this.onWall && this.vy > 0) {
+                // Wall slide
+                this.vy = this.wallSlideSpeed;
+            } else {
+                this.vy += this.gravity * dt;
             }
 
             // Jump
@@ -362,7 +350,7 @@ class Player {
         }
 
         // Collision Detection - Vertical
-        let oldY = this.y - dy; // Previous position to check if we were above
+        let oldY = this.y; // Previous position to check if we were above
         this.y += dy;
         for (let p of platforms) {
             if (AABB(this, p)) {
@@ -623,6 +611,7 @@ class Player {
     }
 
     takeDamage(amount) {
+        if (this.hp <= 0) return;
         this.hp -= amount;
         healthBar.style.width = Math.max(0, (this.hp / this.maxHp) * 100) + '%';
         if (this.hp <= 0) {
@@ -806,6 +795,7 @@ class Enemy {
     }
 
     takeDamage(amount) {
+        if (this.dead) return;
         this.hp -= amount;
         if (this.hp <= 0) {
             // Die
@@ -989,13 +979,7 @@ function update(deltaTime) {
         generatePlatforms();
     }
 
-    // Clean up old platforms behind camera
-    for (let i = platforms.length - 1; i >= 0; i--) {
-        if (platforms[i].x + platforms[i].width < camera.x - 3000) {
-            platforms.splice(i, 1);
-        }
-    }
-
+    // Platforms are not deleted behind camera to support bidirectional progression
     updateParticles(deltaTime);
 
     // Spawn enemies

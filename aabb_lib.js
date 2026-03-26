@@ -8,4 +8,6 @@ function AABB(rect1, rect2) {
     );
 }
 
-module.exports = AABB;
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = AABB;
+}
