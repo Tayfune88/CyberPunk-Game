@@ -1100,12 +1100,14 @@ function draw(ctx) {
     ctx.lineWidth = 1;
     let offsetX = camera.x % 50;
 
+    ctx.beginPath();
     for(let i = -offsetX; i < canvas.width; i += 50) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+        ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height);
     }
     for(let i = 0; i < canvas.height; i += 50) {
-        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+        ctx.moveTo(0, i); ctx.lineTo(canvas.width, i);
     }
+    ctx.stroke();
 
     // Apply camera transform for world objects
     ctx.save();
