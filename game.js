@@ -32,7 +32,8 @@ const keys = {
     right: false,
     up: false,
     down: false,
-    shift: false
+    shift: false,
+    space: false
 };
 
 const mouse = {
@@ -54,6 +55,7 @@ window.addEventListener('keydown', (e) => {
         case 'ArrowDown': keys.down = true; break;
         case 'ShiftLeft':
         case 'ShiftRight': keys.shift = true; break;
+        case 'Space': keys.space = true; break;
     }
 });
 
@@ -69,6 +71,7 @@ window.addEventListener('keyup', (e) => {
         case 'ArrowDown': keys.down = false; break;
         case 'ShiftLeft':
         case 'ShiftRight': keys.shift = false; break;
+        case 'Space': keys.space = false; break;
     }
 });
 
@@ -297,21 +300,21 @@ class Player {
                 createParticles(this.x + this.width/2, this.y + this.height/2, 10, '#0ff');
             }
 
-            // Melee Attack (Left Click)
-            if (mouse.leftClick && this.meleeCooldownTimer <= 0 && !this.isDashing) {
+            // Melee Attack (Spacebar)
+            if (keys.space && this.meleeCooldownTimer <= 0 && !this.isDashing) {
                 this.isAttackingMelee = true;
                 this.meleeTimer = this.meleeDuration;
                 this.meleeCooldownTimer = this.meleeCooldown;
-                mouse.leftClick = false; // Prevent holding
+                keys.space = false; // Prevent holding
 
                 // Melee logic handled in update() or enemies update()
                 checkMeleeHit(this);
             }
 
-            // Ranged Attack (Right Click)
-            if (mouse.rightClick && this.rangedCooldownTimer <= 0 && !this.isDashing) {
+            // Ranged Attack (Left Click)
+            if (mouse.leftClick && this.rangedCooldownTimer <= 0 && !this.isDashing) {
                 this.rangedCooldownTimer = this.rangedCooldown;
-                mouse.rightClick = false; // Prevent holding
+                mouse.leftClick = false; // Prevent holding
 
                 // Calculate direction towards mouse
                 const originX = this.x + this.width/2;
@@ -508,8 +511,8 @@ class Player {
 
         if (this.isAttackingMelee) {
             let swingProg = 1 - (this.meleeTimer / this.meleeDuration);
-            // Dynamic swooping attack
-            ctx.rotate(-Math.PI * 0.5 + swingProg * Math.PI * 1.8);
+            // Dynamic 360 swooping attack
+            ctx.rotate(-Math.PI * 0.5 + swingProg * Math.PI * 2.5);
             ctx.translate(swingProg * 10, 0); // Lunge forward slightly
         } else if (isRunning) {
             ctx.rotate(Math.PI * 0.2 + Math.sin(this.animTimer * 20) * 0.4);
@@ -597,18 +600,18 @@ class Player {
             ctx.shadowBlur = 20;
             ctx.shadowColor = '#0f0';
 
-            let hx = this.facingRight ? this.x + this.width/2 : this.x + this.width/2;
+            let hx = this.x + this.width/2;
             let hy = this.y + this.height/2;
-            let radius = 60;
+            let radius = 70;
             let swingProg = 1 - (this.meleeTimer / this.meleeDuration);
 
             ctx.beginPath();
             if (this.facingRight) {
-                ctx.arc(hx, hy, radius, -Math.PI/2, -Math.PI/2 + swingProg * Math.PI, false);
-                ctx.arc(hx, hy, radius - 20, -Math.PI/2 + swingProg * Math.PI, -Math.PI/2, true);
+                ctx.arc(hx, hy, radius, -Math.PI/2, -Math.PI/2 + swingProg * Math.PI * 2.5, false);
+                ctx.arc(hx, hy, radius - 20, -Math.PI/2 + swingProg * Math.PI * 2.5, -Math.PI/2, true);
             } else {
-                ctx.arc(hx, hy, radius, -Math.PI/2, -Math.PI/2 - swingProg * Math.PI, true);
-                ctx.arc(hx, hy, radius - 20, -Math.PI/2 - swingProg * Math.PI, -Math.PI/2, false);
+                ctx.arc(hx, hy, radius, -Math.PI/2, -Math.PI/2 - swingProg * Math.PI * 2.5, true);
+                ctx.arc(hx, hy, radius - 20, -Math.PI/2 - swingProg * Math.PI * 2.5, -Math.PI/2, false);
             }
             ctx.fill();
             ctx.shadowBlur = 0;
@@ -673,9 +676,9 @@ class Projectile {
 }
 
 function checkMeleeHit(player) {
-    let hitboxWidth = 70; // Match new visual size
-    let hitboxHeight = 80;
-    let hx = player.facingRight ? player.x + player.width : player.x - hitboxWidth;
+    let hitboxWidth = 140; // Full 360 width
+    let hitboxHeight = 140;
+    let hx = player.x + player.width/2 - hitboxWidth/2;
     let hy = player.y + player.height/2 - hitboxHeight/2;
 
     let hitbox = { x: hx, y: hy, width: hitboxWidth, height: hitboxHeight };
@@ -1075,8 +1078,20 @@ function update(deltaTime) {
                 }
             }
         } else {
-            // Enemy projectile hits player
-            if (AABB(p, player) && !player.isDashing) { // Phase dash grants invincibility
+            // Enemy projectile hits player or sword block
+            let blockHitbox = {
+                x: player.x + player.width/2 - 70,
+                y: player.y + player.height/2 - 70,
+                width: 140,
+                height: 140
+            };
+
+            if (player.isAttackingMelee && AABB(p, blockHitbox)) {
+                // Projectile blocked by sword
+                createParticles(p.x, p.y, 10, '#0f0'); // Sword color sparks
+                projectiles.splice(i, 1);
+                removed = true;
+            } else if (AABB(p, player) && !player.isDashing) { // Phase dash grants invincibility
                 createParticles(player.x + player.width/2, player.y + player.height/2, 10, p.color);
                 player.takeDamage(10);
                 projectiles.splice(i, 1);
