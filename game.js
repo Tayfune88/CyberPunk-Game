@@ -217,6 +217,11 @@ class Player {
         this.maxEnergy = 100;
         this.animTimer = 0;
 
+        // Jump Charge
+        this.isChargingJump = false;
+        this.jumpChargeTimer = 0;
+        this.maxJumpChargeTime = 2.5;
+
         // Abilities
         this.canDash = true;
         this.dashCooldown = 1.5;
@@ -323,12 +328,26 @@ class Player {
                 }
             }
 
-            // Jump
+            // Jump Charge Logic
             if (keys.up) {
                 if (this.grounded) {
-                    this.vy = this.jumpForce;
-                    this.grounded = false;
-                    keys.up = false; // Prevent holding jump
+                    this.isChargingJump = true;
+                    this.jumpChargeTimer += dt;
+                    if (this.jumpChargeTimer > this.maxJumpChargeTime) {
+                        this.jumpChargeTimer = this.maxJumpChargeTime;
+                    }
+
+                    // Optional visual feedback for charging
+                    if (Math.random() < 0.2) {
+                        particles.push({
+                            x: this.x + this.width / 2 + (Math.random() - 0.5) * 20,
+                            y: this.y + this.height,
+                            vx: 0,
+                            vy: -50,
+                            life: 0.2 + Math.random() * 0.2,
+                            color: '#0ff'
+                        });
+                    }
                 } else if (this.onWall) {
                     // Wall Jump
                     this.vy = this.wallJumpForceY;
@@ -336,6 +355,23 @@ class Player {
                     this.onWall = false;
                     this.grounded = false;
                     keys.up = false;
+                }
+            } else {
+                if (this.isChargingJump && this.grounded) {
+                    // Release jump
+                    let chargeRatio = this.jumpChargeTimer / this.maxJumpChargeTime;
+                    // Because height = v^2 / 2g, to triple the jump height, the velocity multiplier is sqrt(3) ~ 1.732.
+                    // 1 + chargeRatio * (1.732 - 1)
+                    let jumpMultiplier = 1 + (chargeRatio * 0.732);
+                    // The jumpForce is negative
+                    this.vy = this.jumpForce * jumpMultiplier;
+                    this.grounded = false;
+
+                    this.isChargingJump = false;
+                    this.jumpChargeTimer = 0;
+                } else {
+                    this.isChargingJump = false;
+                    this.jumpChargeTimer = 0;
                 }
             }
 
@@ -471,6 +507,18 @@ class Player {
         if (!this.facingRight && lean !== 0) lean = -lean;
 
         ctx.rotate(lean);
+
+        // --- Jump Charge Aura ---
+        if (this.isChargingJump) {
+            let chargeRatio = this.jumpChargeTimer / this.maxJumpChargeTime;
+            ctx.fillStyle = `rgba(0, 255, 255, ${0.1 + chargeRatio * 0.4})`;
+            ctx.shadowBlur = 10 + chargeRatio * 30;
+            ctx.shadowColor = '#0ff';
+            ctx.beginPath();
+            ctx.arc(0, 0, 30 + chargeRatio * 20, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
 
         // --- Core Cyborg Body ---
 
