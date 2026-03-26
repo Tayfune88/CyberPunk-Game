@@ -940,9 +940,11 @@ function initLevel() {
     platforms = [];
     platformGenerator.lastX = 0;
 
+    const floorY = canvas.height - 50;
+
     // Initial safe zone
-    platforms.push(new Platform(0, 550, 800, 50));
-    platforms.push(new Platform(0, 0, 50, 550, true)); // Starting left wall
+    platforms.push(new Platform(0, floorY, Math.max(800, canvas.width), 50));
+    platforms.push(new Platform(0, 0, 50, floorY, true)); // Starting left wall
 
     // Generate next chunks
     generatePlatforms();
@@ -953,6 +955,8 @@ function generatePlatforms() {
     let startX = platformGenerator.lastX + platformGenerator.chunkWidth;
     let endX = startX + platformGenerator.chunkWidth;
 
+    const floorY = canvas.height - 50;
+
     // Add floor gaps and varied heights
     let floorX = startX;
     while (floorX < endX) {
@@ -962,7 +966,7 @@ function generatePlatforms() {
         let pHeight = 50;
 
         if (!hasGap || floorX === startX) {
-            platforms.push(new Platform(floorX, 550, pWidth, pHeight));
+            platforms.push(new Platform(floorX, floorY, pWidth, pHeight));
         }
 
         let spawnedWall = false;
@@ -973,7 +977,7 @@ function generatePlatforms() {
             let wallHeight = 150 + Math.random() * 150;
             // Position wall in middle of platform, ensuring enough space to jump on both sides
             let wallX = floorX + pWidth/2 - 25;
-            platforms.push(new Platform(wallX, 550 - wallHeight, 50, wallHeight, true));
+            platforms.push(new Platform(wallX, floorY - wallHeight, 50, wallHeight, true));
             spawnedWall = true;
         }
 
@@ -986,7 +990,11 @@ function generatePlatforms() {
     while (floatsCreated < 4 && floatAttempts < 20) {
         floatAttempts++;
         let fx = startX + Math.random() * (platformGenerator.chunkWidth - 100);
-        let fy = 200 + Math.random() * 150;
+        // Base floating platforms relative to canvas height, so they don't clip off top or stay too low
+        let maxFloatY = floorY - 150; // At least 150px above floor
+        let minFloatY = 100; // At least 100px from top
+        let fyRange = Math.max(10, maxFloatY - minFloatY);
+        let fy = minFloatY + Math.random() * fyRange;
         let fw = 80 + Math.random() * 150;
 
         let valid = true;
@@ -1019,6 +1027,29 @@ function initGame() {
     gameState.running = true;
     gameState.score = 0;
 
+    // Resolution initialization
+    let resSelect = document.getElementById('resolution-select');
+    if (resSelect) {
+        let resParts = resSelect.value.split('x');
+        let rW = parseInt(resParts[0]);
+        let rH = parseInt(resParts[1]);
+        if (!isNaN(rW) && !isNaN(rH)) {
+            canvas.width = rW;
+            canvas.height = rH;
+
+            // Update container and dashboard styles
+            let container = document.getElementById('game-container');
+            if (container) {
+                container.style.width = rW + 'px';
+                container.style.height = rH + 'px';
+            }
+            let dashboard = document.getElementById('side-dashboard');
+            if (dashboard) {
+                dashboard.style.height = rH + 'px';
+            }
+        }
+    }
+
     // Highscore initialization
     let nameInput = document.getElementById('player-name-input');
     gameState.playerName = nameInput.value.trim() !== '' ? nameInput.value.trim().toUpperCase() : 'UNKNOWN';
@@ -1038,14 +1069,16 @@ function initGame() {
     camera.y = 0;
 
     initLevel();
-    player = new Player(100, 400);
+    player = new Player(100, canvas.height - 200);
+    camera.offset = canvas.width * 0.25; // 25% of screen width
+
     particles = [];
     projectiles = [];
     enemies = [];
     enemySpawnTimer = 2.0;
 
     // Spawn initial enemy ahead
-    enemies.push(new Enemy(600, 300));
+    enemies.push(new Enemy(600, canvas.height - 300));
 
     gameState.lastTime = performance.now();
     requestAnimationFrame(gameLoop);
