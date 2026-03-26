@@ -181,11 +181,6 @@ class Player {
 
         this.rangedCooldown = 0.5;
         this.rangedCooldownTimer = 0;
-        this.dashTimer = 0;
-        this.isDashing = false;
-        this.dashSpeed = 1000;
-        this.dashDuration = 0.15;
-        this.dashActiveTimer = 0;
 
         // Wall running
         this.onWall = false;
