@@ -476,10 +476,7 @@ class Player {
         ctx.rotate(armAngle);
 
         // Shoulder
-        ctx.fillStyle = '#333';
-        ctx.beginPath();
-        ctx.arc(0, 0, 6, 0, Math.PI * 2);
-        ctx.fill();
+        this.drawShoulder(ctx);
 
         // Arm
         ctx.fillStyle = '#222';
@@ -521,10 +518,7 @@ class Player {
         }
 
         // Shoulder
-        ctx.fillStyle = '#333';
-        ctx.beginPath();
-        ctx.arc(0, 0, 6, 0, Math.PI * 2);
-        ctx.fill();
+        this.drawShoulder(ctx);
 
         // Arm
         ctx.fillStyle = '#222';
@@ -619,6 +613,13 @@ class Player {
             ctx.fill();
             ctx.shadowBlur = 0;
         }
+    }
+
+    drawShoulder(ctx) {
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(0, 0, 6, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     takeDamage(amount) {
