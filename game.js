@@ -16,7 +16,9 @@ let gameState = {
     lastTime: 0,
     gravity: 0.8,
     friction: 0.8,
-    deltaTime: 0
+    deltaTime: 0,
+    gameTime: 0,
+    bossSpawned: false
 };
 
 // Camera
@@ -822,6 +824,87 @@ class Enemy {
 }
 
 
+
+class BossEnemy extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.width = 100;
+        this.height = 100;
+        this.hp = 1000;
+        this.maxHp = 1000;
+        this.speed = 50;
+        this.color = '#f0f'; // Purple boss
+        this.fireCooldown = 1.0;
+        this.fireTimer = 1.0;
+    }
+
+    draw(ctx) {
+        this.animTimer += gameState.deltaTime;
+
+        ctx.save();
+        let hoverY = Math.sin(this.animTimer * 2) * 10;
+        ctx.translate(this.x + this.width/2, this.y + this.height/2 + hoverY);
+
+        if (player.x < this.x) {
+            ctx.scale(-1, 1);
+        }
+
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = this.color;
+
+        // Big Boss Body
+        ctx.fillStyle = '#111';
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 4;
+
+        ctx.beginPath();
+        ctx.moveTo(-40, -30);
+        ctx.lineTo(30, -40);
+        ctx.lineTo(40, 0);
+        ctx.lineTo(20, 40);
+        ctx.lineTo(-30, 30);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Thruster
+        ctx.fillStyle = '#f0f';
+        ctx.beginPath();
+        ctx.moveTo(-20, 30);
+        ctx.lineTo(-10, 50 + Math.random() * 20);
+        ctx.lineTo(10, 40);
+        ctx.fill();
+
+        // Eye/Sensor
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(15, -10, 10, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+        ctx.shadowBlur = 0;
+
+        // Draw Health Bar
+        ctx.fillStyle = '#222';
+        ctx.fillRect(this.x, this.y - 20, this.width, 8);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y - 20, this.width * (this.hp / this.maxHp), 8);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x, this.y - 20, this.width, 8);
+    }
+
+    takeDamage(amount) {
+        this.hp -= amount;
+        if (this.hp <= 0) {
+            createParticles(this.x + this.width/2, this.y + this.height/2, 100, this.color);
+            gameState.score += 5000;
+            scoreDisplay.innerText = gameState.score;
+            this.dead = true;
+        }
+    }
+}
+
 let enemySpawnTimer = 0;
 const enemySpawnRate = 3.0; // seconds
 
@@ -946,6 +1029,8 @@ function generatePlatforms() {
 function initGame() {
     gameState.running = true;
     gameState.score = 0;
+    gameState.gameTime = 0;
+    gameState.bossSpawned = false;
     scoreDisplay.innerText = gameState.score;
     gameOverScreen.style.display = 'none';
     startScreen.style.display = 'none';
@@ -973,6 +1058,14 @@ function initGame() {
 
 function update(deltaTime) {
     if (!gameState.running) return;
+
+    gameState.gameTime += deltaTime;
+    if (gameState.gameTime >= 15 && !gameState.bossSpawned) {
+        let bx = camera.x + canvas.width + 100;
+        let by = 150;
+        enemies.push(new BossEnemy(bx, by));
+        gameState.bossSpawned = true;
+    }
 
     player.update(deltaTime);
 
@@ -1002,10 +1095,14 @@ function update(deltaTime) {
     enemySpawnTimer -= deltaTime;
     if (enemySpawnTimer <= 0) {
         enemySpawnTimer = enemySpawnRate;
-        if (enemies.length < 5) { // Max enemies on screen
-            let ex = camera.x + canvas.width + Math.random() * 200;
-            let ey = Math.random() * 300 + 50;
-            enemies.push(new Enemy(ex, ey)); // Drone
+        if (enemies.length < 15) { // Max enemies on screen
+            let spawnCount = Math.floor(Math.random() * 3) + 1; // 1 to 3 enemies
+            for (let i = 0; i < spawnCount; i++) {
+                if (enemies.length >= 15) break;
+                let ex = camera.x + canvas.width + Math.random() * 400; // Spread them out a bit
+                let ey = Math.random() * 300 + 50;
+                enemies.push(new Enemy(ex, ey)); // Drone
+            }
         }
     }
 
