@@ -20,7 +20,8 @@ let gameState = {
     playerName: 'UNKNOWN',
     startTime: 0,
     topScore: 0,
-    fireworksTriggered: false
+    fireworksTriggered: false,
+    characterType: 'Viper'
 };
 
 // Highscore Functions
@@ -194,59 +195,111 @@ function AABB(rect1, rect2) {
 }
 
 class Player {
-    constructor(x, y) {
+    constructor(x, y, characterType = 'Viper') {
         this.x = x;
         this.y = y;
+        this.characterType = characterType;
         this.width = 30;
         this.height = 50;
-        this.color = '#0ff';
 
-        // Physics
-        this.vx = 0;
-        this.vy = 0;
-        this.speed = 300; // pixels per second
+        // Default Stats (Viper)
+        this.color = '#0ff';
+        this.speed = 350; // pixels per second
         this.jumpForce = -500;
         this.gravity = 1500;
         this.maxJumps = 3;
-        this.jumpsLeft = 3;
+        this.maxHp = 100;
 
-        // State
+        // Abilities defaults
+        this.dashCooldown = 1.5;
+        this.dashSpeed = 1000;
+        this.dashDuration = 0.15;
+
+        // Combat defaults
+        this.meleeDuration = 0.2;
+        this.meleeCooldown = 0.4;
+        this.rangedCooldown = 0.4;
+
+        // Wall running defaults
+        this.wallSlideSpeed = 100;
+        this.wallJumpForceX = 400;
+        this.wallJumpForceY = -450;
+
+        // Apply Character specific stats
+        switch(this.characterType) {
+            case 'Titan':
+                this.width = 40;
+                this.height = 60;
+                this.color = '#f50';
+                this.speed = 220; // Slower
+                this.jumpForce = -450; // Lower jump
+                this.maxJumps = 2; // Less jumps
+                this.maxHp = 200; // Tanky
+                this.dashCooldown = 3.0; // Slower dash cooldown
+                this.dashSpeed = 600; // Slower dash
+                this.dashDuration = 0.3; // Longer dash duration
+                this.meleeDuration = 0.5; // Slow heavy swing
+                this.meleeCooldown = 0.8;
+                this.rangedCooldown = 1.0; // Slow fire rate cannon
+                break;
+            case 'Nova':
+                this.color = '#f0f';
+                this.speed = 300;
+                this.jumpForce = -550; // Higher jump
+                this.maxJumps = 2;
+                this.maxHp = 100;
+                this.dashCooldown = 0.1; // Energy based jetpack, low cooldown
+                this.meleeDuration = 0.25;
+                this.meleeCooldown = 0.5;
+                this.rangedCooldown = 0.15; // Fast fire rate plasma
+                break;
+            case 'Oracle':
+                this.width = 25;
+                this.height = 55;
+                this.color = '#ff0';
+                this.speed = 320;
+                this.jumpForce = -500;
+                this.maxJumps = 3;
+                this.maxHp = 120;
+                this.dashCooldown = 2.0; // Teleport cooldown
+                this.dashSpeed = 0; // Teleport is instant, no speed
+                this.dashDuration = 0.1;
+                this.meleeDuration = 0.3;
+                this.meleeCooldown = 0.6;
+                this.rangedCooldown = 0.6; // Medium fire rate orb
+                break;
+            case 'Viper':
+            default:
+                // Uses defaults
+                break;
+        }
+
+        // Initialize state
+        this.vx = 0;
+        this.vy = 0;
+        this.jumpsLeft = this.maxJumps;
         this.grounded = false;
         this.facingRight = true;
         this.isAirRolling = false;
         this.airRollTimer = 0;
         this.airRollDuration = 0.5;
-        this.hp = 100;
-        this.maxHp = 100;
+        this.hp = this.maxHp;
         this.energy = 100;
         this.maxEnergy = 100;
         this.animTimer = 0;
 
-        // Abilities
         this.canDash = true;
-        this.dashCooldown = 1.5;
         this.dashTimer = 0;
         this.isDashing = false;
-        this.dashSpeed = 1000;
-        this.dashDuration = 0.15;
         this.dashActiveTimer = 0;
 
-        // Combat
         this.isAttackingMelee = false;
         this.meleeTimer = 0;
-        this.meleeDuration = 0.3; // Slower, heavier swing
-        this.meleeCooldown = 0.5;
         this.meleeCooldownTimer = 0;
-
-        this.rangedCooldown = 0.5;
         this.rangedCooldownTimer = 0;
 
-        // Wall running
         this.onWall = false;
-        this.wallNormalX = 0; // -1 for right wall, 1 for left wall
-        this.wallSlideSpeed = 100;
-        this.wallJumpForceX = 400;
-        this.wallJumpForceY = -450;
+        this.wallNormalX = 0;
     }
 
     update(dt) {
@@ -277,32 +330,46 @@ class Player {
             this.dashActiveTimer -= dt;
             if (this.dashActiveTimer <= 0) {
                 this.isDashing = false;
-                this.vy = 0; // Stop vertical movement after dash
+                if (this.characterType !== 'Nova') {
+                    this.vy = 0; // Stop vertical movement after dash
+                }
             } else {
-                // Dash Movement
-                this.vx = this.facingRight ? this.dashSpeed : -this.dashSpeed;
-                this.vy = 0; // No gravity during dash
+                if (this.characterType === 'Nova') {
+                    // Jetpack lift
+                    this.vy = -this.dashSpeed;
+                    this.vx = keys.left ? -this.speed : (keys.right ? this.speed : 0);
+                    createParticles(this.x + this.width/2, this.y + this.height, 5, '#f0f');
+                } else if (this.characterType === 'Oracle') {
+                    // Handled instantly in dash initiation
+                } else {
+                    // Dash Movement (Viper, Titan)
+                    this.vx = this.facingRight ? this.dashSpeed : -this.dashSpeed;
+                    this.vy = 0; // No gravity during dash
 
-                // Lightning trail effect
-                let px = this.x + this.width/2 + (Math.random() - 0.5) * 30;
-                let py = this.y + this.height/2 + (Math.random() - 0.5) * 40;
+                    let pColor = this.characterType === 'Titan' ? '#f50' : '#0ff';
+                    let coreColor = this.characterType === 'Titan' ? '#ff0' : '#fff';
 
-                particles.push({
-                    x: px,
-                    y: py,
-                    vx: 0,
-                    vy: 0,
-                    life: 0.2,
-                    color: '#fff' // White hot lightning core
-                });
-                particles.push({
-                    x: px,
-                    y: py,
-                    vx: 0,
-                    vy: 0,
-                    life: 0.3,
-                    color: '#0ff' // Cyan outer glow
-                });
+                    // Lightning trail effect
+                    let px = this.x + this.width/2 + (Math.random() - 0.5) * 30;
+                    let py = this.y + this.height/2 + (Math.random() - 0.5) * 40;
+
+                    particles.push({
+                        x: px,
+                        y: py,
+                        vx: 0,
+                        vy: 0,
+                        life: 0.2,
+                        color: coreColor
+                    });
+                    particles.push({
+                        x: px,
+                        y: py,
+                        vx: 0,
+                        vy: 0,
+                        life: 0.3,
+                        color: pColor
+                    });
+                }
             }
         } else {
             // Normal Movement
@@ -364,10 +431,24 @@ class Player {
                 this.canDash = false;
                 this.dashTimer = this.dashCooldown;
                 this.dashActiveTimer = this.dashDuration;
-                keys.shift = false; // Prevent holding dash
 
-                // Spawn dash particles
-                createParticles(this.x + this.width/2, this.y + this.height/2, 10, '#0ff');
+                if (this.characterType !== 'Nova') {
+                    keys.shift = false; // Prevent holding dash for non-Nova
+                }
+
+                if (this.characterType === 'Oracle') {
+                    // Instant Teleport
+                    createParticles(this.x + this.width/2, this.y + this.height/2, 20, '#ff0');
+                    let tpDist = 200;
+                    this.x += this.facingRight ? tpDist : -tpDist;
+                    createParticles(this.x + this.width/2, this.y + this.height/2, 20, '#ff0');
+                } else if (this.characterType === 'Titan') {
+                    // Heavy dash
+                    createParticles(this.x + this.width/2, this.y + this.height/2, 10, '#f50');
+                } else {
+                    // Spawn dash particles
+                    createParticles(this.x + this.width/2, this.y + this.height/2, 10, '#0ff');
+                }
             }
 
             // Melee Attack (Spacebar)
@@ -379,12 +460,22 @@ class Player {
 
                 // Melee logic handled in update() or enemies update()
                 checkMeleeHit(this);
+
+                // Viper double hit (second hit delayed)
+                if (this.characterType === 'Viper') {
+                    setTimeout(() => {
+                        if (this.isAttackingMelee) checkMeleeHit(this);
+                    }, (this.meleeDuration / 2) * 1000);
+                }
             }
 
             // Ranged Attack (Left Click)
             if (mouse.leftClick && this.rangedCooldownTimer <= 0 && !this.isDashing) {
                 this.rangedCooldownTimer = this.rangedCooldown;
-                mouse.leftClick = false; // Prevent holding
+
+                if (this.characterType !== 'Nova') {
+                    mouse.leftClick = false; // Prevent holding for non-Nova (Nova can spray)
+                }
 
                 // Calculate direction towards mouse
                 const originX = this.x + this.width/2;
@@ -395,9 +486,28 @@ class Player {
                 const worldMouseY = mouse.y;
 
                 const angle = Math.atan2(worldMouseY - originY, worldMouseX - originX);
-                const speed = 800;
 
-                projectiles.push(new Projectile(originX, originY, Math.cos(angle) * speed, Math.sin(angle) * speed, true));
+                if (this.characterType === 'Titan') {
+                    const speed = 500;
+                    projectiles.push(new Projectile(originX, originY, Math.cos(angle) * speed, Math.sin(angle) * speed, true, 20, 10, false, '#f50', 50));
+                } else if (this.characterType === 'Nova') {
+                    const speed = 1000;
+                    // Add slight inaccuracy for fast plasma spray
+                    const spreadAngle = angle + (Math.random() - 0.5) * 0.1;
+                    projectiles.push(new Projectile(originX, originY, Math.cos(spreadAngle) * speed, Math.sin(spreadAngle) * speed, true, 8, 3, false, '#f0f', 15));
+                } else if (this.characterType === 'Oracle') {
+                    const speed = 700;
+                    // Piercing orb
+                    projectiles.push(new Projectile(originX, originY, Math.cos(angle) * speed, Math.sin(angle) * speed, true, 15, 15, true, '#ff0', 30));
+                } else {
+                    // Viper (Twin shot)
+                    const speed = 800;
+                    const offset = 10;
+                    const perpX = Math.cos(angle + Math.PI/2) * offset;
+                    const perpY = Math.sin(angle + Math.PI/2) * offset;
+                    projectiles.push(new Projectile(originX + perpX, originY + perpY, Math.cos(angle) * speed, Math.sin(angle) * speed, true, 10, 4, false, '#0ff', 20));
+                    projectiles.push(new Projectile(originX - perpX, originY - perpY, Math.cos(angle) * speed, Math.sin(angle) * speed, true, 10, 4, false, '#0ff', 20));
+                }
             }
         }
 
@@ -488,7 +598,7 @@ class Player {
 
     draw(ctx) {
         ctx.save();
-        ctx.translate(this.x + this.width/2, this.y + this.height/2);
+        ctx.translate(Math.floor(this.x + this.width/2), Math.floor(this.y + this.height/2));
 
         if (!this.facingRight) {
             ctx.scale(-1, 1);
@@ -504,9 +614,669 @@ class Player {
         if (this.isAirRolling) {
             let rollProg = 1 - (this.airRollTimer / this.airRollDuration);
             let rollAngle = rollProg * Math.PI * 2;
-            ctx.rotate(rollAngle); // Facing scaling ensures correct direction visually
+            ctx.rotate(rollAngle);
         }
 
+        switch(this.characterType) {
+            case 'Titan':
+                this.drawTitan(ctx, isRunning, runBob, lean);
+                break;
+            case 'Viper':
+                this.drawViper(ctx, isRunning, runBob, lean);
+                break;
+            case 'Nova':
+                this.drawNova(ctx, isRunning, runBob, lean);
+                break;
+            case 'Oracle':
+                this.drawOracle(ctx, isRunning, runBob, lean);
+                break;
+            default:
+                this.drawDefault(ctx, isRunning, runBob, lean); // Fallback
+                break;
+        }
+
+        ctx.restore(); // Restore global player transform
+
+        // --- Melee Hitbox Effect (Swoosh) ---
+        if (this.isAttackingMelee && !this.isDashing) {
+            let swingProg = 1 - (this.meleeTimer / this.meleeDuration);
+            let hx = this.x + this.width/2;
+            let hy = this.y + this.height/2;
+            let radius = 70;
+            let effColor = '#0ff';
+            let arcStart = -Math.PI/2;
+            let arcExtent = swingProg * Math.PI * 2.5;
+
+            switch(this.characterType) {
+                case 'Titan':
+                    effColor = 'rgba(255, 85, 0, 0.4)';
+                    ctx.shadowColor = '#f50';
+                    radius = 90;
+                    arcExtent = swingProg * Math.PI * 1.5; // Shorter heavier swing
+                    break;
+                case 'Nova':
+                    effColor = 'rgba(255, 0, 255, 0.4)';
+                    ctx.shadowColor = '#f0f';
+                    radius = 50;
+                    break;
+                case 'Oracle':
+                    effColor = 'rgba(255, 255, 0, 0.4)';
+                    ctx.shadowColor = '#ff0';
+                    radius = 60;
+                    break;
+                case 'Viper':
+                default:
+                    effColor = 'rgba(0, 255, 255, 0.4)';
+                    ctx.shadowColor = '#0ff';
+                    arcStart = -Math.PI;
+                    arcExtent = swingProg * Math.PI * 2; // Fast twin slashes
+                    break;
+            }
+
+            ctx.fillStyle = effColor;
+            ctx.shadowBlur = 20;
+
+            ctx.beginPath();
+            if (this.facingRight) {
+                ctx.arc(hx, hy, radius, arcStart, arcStart + arcExtent, false);
+                ctx.arc(hx, hy, radius - 20, arcStart + arcExtent, arcStart, true);
+            } else {
+                ctx.arc(hx, hy, radius, arcStart, arcStart - arcExtent, true);
+                ctx.arc(hx, hy, radius - 20, arcStart - arcExtent, arcStart, false);
+            }
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    drawTitan(ctx, isRunning, runBob, lean) {
+        // --- Titan Body (Bulky, Red/Yellow Armor) ---
+        ctx.save();
+        ctx.scale(1.2, 1.2); // Bigger overall
+
+        let bounce = runBob * 1.5;
+
+        // Torso
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.moveTo(-15, -25 + bounce);
+        ctx.lineTo(15, -25 + bounce);
+        ctx.lineTo(10, 10 + bounce);
+        ctx.lineTo(-10, 10 + bounce);
+        ctx.closePath();
+        ctx.fill();
+
+        // Red/Yellow Armor Plating
+        ctx.fillStyle = '#b00'; // Dark Red
+        ctx.fillRect(-12, -22 + bounce, 10, 15);
+        ctx.fillRect(2, -22 + bounce, 10, 15);
+
+        ctx.fillStyle = '#fc0'; // Yellow/Gold
+        ctx.beginPath();
+        ctx.moveTo(-15, -25 + bounce);
+        ctx.lineTo(-5, -10 + bounce);
+        ctx.lineTo(-15, -10 + bounce);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(15, -25 + bounce);
+        ctx.lineTo(5, -10 + bounce);
+        ctx.lineTo(15, -10 + bounce);
+        ctx.fill();
+
+        // Head
+        ctx.fillStyle = '#853e2e'; // Skin tone
+        ctx.fillRect(-6, -35 + bounce, 12, 10);
+        // Beard
+        ctx.fillStyle = '#311';
+        ctx.fillRect(-6, -28 + bounce, 12, 4);
+
+        // Cyber Eye (Red Visor)
+        ctx.fillStyle = '#f00';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#f00';
+        ctx.fillRect(0, -32 + bounce, 7, 4);
+        ctx.shadowBlur = 0;
+
+        // --- Right Arm (Cannon) ---
+        let armAngle = 0;
+        if (!this.grounded) armAngle = -0.2;
+        if (this.rangedCooldownTimer > this.rangedCooldown - 0.2) {
+            armAngle -= 0.5; // Big recoil
+            bounce -= 4;
+        }
+
+        ctx.save();
+        ctx.translate(8, -18 + bounce);
+        ctx.rotate(armAngle);
+        // Shoulder pad
+        ctx.fillStyle = '#b00';
+        ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fc0';
+        ctx.fillRect(-4, -6, 8, 4);
+
+        // Arm
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-4, 0, 8, 15);
+
+        // Big Cannon
+        ctx.fillStyle = '#444';
+        ctx.fillRect(-6, 12, 25, 12);
+        ctx.fillStyle = '#b00';
+        ctx.fillRect(-2, 12, 15, 4);
+
+        if (this.rangedCooldownTimer > this.rangedCooldown - 0.1) {
+            ctx.fillStyle = '#ff0';
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#f50';
+            ctx.beginPath(); ctx.arc(22, 18, 15, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+        ctx.restore();
+
+        // --- Left Arm (Power Fist) ---
+        ctx.save();
+        ctx.translate(-8, -18 + bounce);
+
+        if (this.isAttackingMelee) {
+            let swingProg = 1 - (this.meleeTimer / this.meleeDuration);
+            // Heavy punch forward
+            ctx.translate(swingProg * 25, -swingProg * 10);
+            ctx.rotate(-Math.PI * 0.4);
+        } else if (isRunning) {
+            ctx.rotate(Math.PI * 0.2 + Math.sin(this.animTimer * 15) * 0.5);
+        } else {
+            ctx.rotate(Math.PI * 0.1);
+        }
+
+        // Shoulder pad
+        ctx.fillStyle = '#b00';
+        ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
+
+        // Arm
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-4, 0, 8, 15);
+
+        // Huge Fist
+        ctx.fillStyle = '#fc0';
+        ctx.fillRect(-8, 15, 16, 16);
+        ctx.fillStyle = '#b00';
+        ctx.fillRect(-4, 15, 8, 16);
+        ctx.fillStyle = '#fff'; // Knuckles
+        ctx.fillRect(-8, 31, 16, 4);
+
+        ctx.restore();
+
+        // --- Legs ---
+        let legSwing = isRunning ? Math.sin(this.animTimer * 15) * 12 : 0; // Slower steps
+        let legSpread = this.grounded ? 0 : 5;
+
+        // Back Leg
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-10, 8 + bounce, 8, 12);
+        ctx.save();
+        ctx.translate(-6, 20 + bounce);
+        ctx.rotate(-legSwing * 0.05);
+        ctx.fillStyle = '#b00';
+        ctx.fillRect(-4, 0, 8, 15 + legSpread);
+        ctx.fillStyle = '#f50';
+        ctx.fillRect(-4, 12 + legSpread, 12, 6); // Big boot
+        ctx.restore();
+
+        // Front Leg
+        ctx.fillStyle = '#333';
+        ctx.fillRect(2, 8 + bounce, 8, 12);
+        ctx.save();
+        ctx.translate(6, 20 + bounce);
+        ctx.rotate(legSwing * 0.05);
+        ctx.fillStyle = '#b00';
+        ctx.fillRect(-4, 0, 8, 15 + legSpread);
+        ctx.fillStyle = '#f50';
+        ctx.fillRect(-4, 12 + legSpread, 12, 6); // Big boot
+        ctx.restore();
+
+        ctx.restore();
+    }
+
+    drawViper(ctx, isRunning, runBob, lean) {
+        // --- Viper Body (Slim, Red/White Jacket, Purple Boots) ---
+        ctx.save();
+        ctx.scale(0.9, 1.0); // Slightly slimmer
+
+        let bounce = runBob;
+
+        // Torso / White Dress
+        ctx.fillStyle = '#eee';
+        ctx.beginPath();
+        ctx.moveTo(-8, -20 + bounce);
+        ctx.lineTo(8, -20 + bounce);
+        ctx.lineTo(10, 5 + bounce);
+        ctx.lineTo(5, 12 + bounce);
+        ctx.lineTo(-5, 12 + bounce);
+        ctx.lineTo(-10, 5 + bounce);
+        ctx.closePath();
+        ctx.fill();
+
+        // Red Jacket
+        ctx.fillStyle = '#d22';
+        ctx.beginPath();
+        ctx.moveTo(-10, -22 + bounce);
+        ctx.lineTo(-2, -10 + bounce);
+        ctx.lineTo(-8, 5 + bounce);
+        ctx.lineTo(-12, -10 + bounce);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(10, -22 + bounce);
+        ctx.lineTo(2, -10 + bounce);
+        ctx.lineTo(8, 5 + bounce);
+        ctx.lineTo(12, -10 + bounce);
+        ctx.fill();
+
+        // Head
+        ctx.fillStyle = '#a67b5b'; // Skin tone
+        ctx.fillRect(-5, -30 + bounce, 10, 10);
+
+        // Hair (Brown, high ponytail)
+        ctx.fillStyle = '#310';
+        ctx.fillRect(-6, -34 + bounce, 12, 6);
+        // Ponytail physics
+        let hairSwing = isRunning ? -Math.sin(this.animTimer * 20) * 15 : 0;
+        ctx.save();
+        ctx.translate(0, -32 + bounce);
+        ctx.rotate(hairSwing * 0.05 - 0.5);
+        ctx.fillRect(-12, -2, 12, 4);
+        ctx.restore();
+
+        // Glasses/Visor (Orange tint)
+        ctx.fillStyle = 'rgba(255, 100, 0, 0.7)';
+        ctx.fillRect(-4, -28 + bounce, 10, 3);
+
+        // --- Right Arm (Pistol) ---
+        let armAngle = 0;
+        if (!this.grounded) armAngle = -0.4;
+        if (this.rangedCooldownTimer > this.rangedCooldown - 0.1) {
+            armAngle -= 0.3;
+        }
+
+        ctx.save();
+        ctx.translate(6, -16 + bounce);
+        ctx.rotate(armAngle);
+
+        // Arm (Jacket sleeve)
+        ctx.fillStyle = '#d22';
+        ctx.fillRect(-3, 0, 6, 10);
+        // Forearm (Skin)
+        ctx.fillStyle = '#a67b5b';
+        ctx.fillRect(-2, 10, 4, 6);
+
+        // Pistol
+        ctx.fillStyle = '#444';
+        ctx.fillRect(-3, 16, 12, 4);
+        ctx.fillRect(-3, 16, 4, 8);
+
+        if (this.rangedCooldownTimer > this.rangedCooldown - 0.05) {
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#0ff';
+            ctx.beginPath(); ctx.arc(10, 18, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+        ctx.restore();
+
+        // --- Left Arm (Dagger) ---
+        ctx.save();
+        ctx.translate(-6, -16 + bounce);
+
+        if (this.isAttackingMelee) {
+            let swingProg = 1 - (this.meleeTimer / this.meleeDuration);
+            // Fast double slash motion
+            ctx.rotate(-Math.PI * 0.5 + Math.sin(swingProg * Math.PI * 4) * 2.0);
+        } else if (isRunning) {
+            ctx.rotate(Math.PI * 0.3 + Math.sin(this.animTimer * 20) * 0.4);
+        } else {
+            ctx.rotate(Math.PI * 0.1);
+        }
+
+        // Arm (Jacket sleeve)
+        ctx.fillStyle = '#d22';
+        ctx.fillRect(-3, 0, 6, 10);
+        // Forearm (Skin)
+        ctx.fillStyle = '#a67b5b';
+        ctx.fillRect(-2, 10, 4, 6);
+
+        // Dagger
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-1, 15, 2, 6); // Hilt
+        ctx.fillStyle = '#0ff';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#0ff';
+        ctx.beginPath();
+        ctx.moveTo(-2, 21);
+        ctx.lineTo(2, 21);
+        ctx.lineTo(0, 35); // Blade
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.restore();
+
+        // --- Legs (Purple Cyber Boots) ---
+        let legSwing = isRunning ? Math.sin(this.animTimer * 20) * 20 : 0;
+        let legSpread = this.grounded ? 0 : 10;
+
+        // Back Leg
+        ctx.fillStyle = '#a67b5b'; // Thigh
+        ctx.fillRect(-6, 8 + bounce, 5, 10);
+        ctx.save();
+        ctx.translate(-4, 18 + bounce);
+        ctx.rotate(-legSwing * 0.05);
+        ctx.fillStyle = '#639'; // Purple boot
+        ctx.fillRect(-3, 0, 6, 15 + legSpread);
+        ctx.fillStyle = '#f50'; // Orange accent
+        ctx.fillRect(-3, 12 + legSpread, 8, 4);
+        ctx.restore();
+
+        // Front Leg
+        ctx.fillStyle = '#a67b5b'; // Thigh
+        ctx.fillRect(1, 8 + bounce, 5, 10);
+        ctx.save();
+        ctx.translate(3, 18 + bounce);
+        ctx.rotate(legSwing * 0.05);
+        ctx.fillStyle = '#74a'; // Purple boot
+        ctx.fillRect(-3, 0, 6, 15 + legSpread);
+        ctx.fillStyle = '#f50'; // Orange accent
+        ctx.fillRect(-3, 12 + legSpread, 8, 4);
+        ctx.restore();
+
+        ctx.restore();
+    }
+
+    drawNova(ctx, isRunning, runBob, lean) {
+        // --- Nova Body (Blue pigtails, pink/blue suit) ---
+        ctx.save();
+        ctx.scale(0.85, 0.95);
+
+        let bounce = runBob;
+
+        // Torso / Suit
+        ctx.fillStyle = '#228'; // Dark Blue suit base
+        ctx.beginPath();
+        ctx.moveTo(-10, -20 + bounce);
+        ctx.lineTo(10, -20 + bounce);
+        ctx.lineTo(8, 8 + bounce);
+        ctx.lineTo(-8, 8 + bounce);
+        ctx.closePath();
+        ctx.fill();
+
+        // Pink cyber accents
+        ctx.fillStyle = '#f0f';
+        ctx.fillRect(-6, -15 + bounce, 12, 4);
+        ctx.fillRect(-8, 0 + bounce, 16, 3);
+
+        // Head
+        ctx.fillStyle = '#e5c298'; // Skin tone
+        ctx.fillRect(-6, -30 + bounce, 12, 10);
+
+        // Hair (Cyan pigtails)
+        ctx.fillStyle = '#0ff';
+        ctx.fillRect(-7, -32 + bounce, 14, 6); // Bangs
+
+        let hairSwing = isRunning ? -Math.sin(this.animTimer * 20) * 10 : 0;
+
+        // Left Pigtail
+        ctx.save();
+        ctx.translate(-7, -28 + bounce);
+        ctx.rotate(-0.5 + hairSwing * 0.05);
+        ctx.beginPath();
+        ctx.moveTo(0, 0); ctx.lineTo(-8, -10); ctx.lineTo(-12, 2); ctx.fill();
+        ctx.restore();
+
+        // Right Pigtail
+        ctx.save();
+        ctx.translate(7, -28 + bounce);
+        ctx.rotate(0.5 + hairSwing * 0.05);
+        ctx.beginPath();
+        ctx.moveTo(0, 0); ctx.lineTo(8, -10); ctx.lineTo(12, 2); ctx.fill();
+        ctx.restore();
+
+        // --- Right Arm (Plasma Rifle) ---
+        let armAngle = 0;
+        if (!this.grounded) armAngle = -0.3;
+        if (this.rangedCooldownTimer > this.rangedCooldown - 0.1) {
+            armAngle -= 0.1; // Fast, small recoil
+            bounce -= 1;
+        }
+
+        ctx.save();
+        ctx.translate(6, -16 + bounce);
+        ctx.rotate(armAngle);
+
+        // Arm
+        ctx.fillStyle = '#228';
+        ctx.fillRect(-3, 0, 6, 12);
+
+        // Plasma Rifle
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(-4, 12, 18, 5); // Main body
+        ctx.fillStyle = '#f0f';
+        ctx.fillRect(-2, 14, 10, 2); // Pink stripe
+        ctx.fillStyle = '#0ff';
+        ctx.fillRect(14, 13, 6, 3); // Muzzle
+
+        if (this.rangedCooldownTimer > this.rangedCooldown - 0.05) {
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#f0f';
+            ctx.beginPath(); ctx.arc(20, 14, 6, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+        ctx.restore();
+
+        // --- Left Arm (Energy Baton) ---
+        ctx.save();
+        ctx.translate(-6, -16 + bounce);
+
+        if (this.isAttackingMelee) {
+            let swingProg = 1 - (this.meleeTimer / this.meleeDuration);
+            ctx.rotate(-Math.PI * 0.5 + swingProg * Math.PI * 2);
+        } else if (isRunning) {
+            ctx.rotate(Math.PI * 0.2 + Math.sin(this.animTimer * 20) * 0.4);
+        } else {
+            ctx.rotate(-Math.PI * 0.1);
+        }
+
+        // Arm
+        ctx.fillStyle = '#228';
+        ctx.fillRect(-3, 0, 6, 10);
+
+        // Baton Handle
+        ctx.fillStyle = '#333';
+        ctx.fillRect(-2, 10, 4, 8);
+
+        // Pink Energy Blade
+        ctx.fillStyle = '#f0f';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#f0f';
+        ctx.fillRect(-1, 18, 2, 20);
+        ctx.shadowBlur = 0;
+
+        ctx.restore();
+
+        // --- Legs (Pink/Blue gradient look) ---
+        let legSwing = isRunning ? Math.sin(this.animTimer * 20) * 15 : 0;
+        let legSpread = this.grounded ? 0 : 8;
+
+        // Back Leg
+        ctx.save();
+        ctx.translate(-4, 8 + bounce);
+        ctx.rotate(-legSwing * 0.05);
+        ctx.fillStyle = '#114';
+        ctx.fillRect(-3, 0, 6, 12);
+        ctx.fillStyle = '#f0f';
+        ctx.fillRect(-3, 12, 6, 15 + legSpread); // Pink lower leg
+        ctx.fillStyle = '#0ff';
+        ctx.fillRect(-4, 25 + legSpread, 8, 4); // Cyan shoe
+        ctx.restore();
+
+        // Front Leg
+        ctx.save();
+        ctx.translate(4, 8 + bounce);
+        ctx.rotate(legSwing * 0.05);
+        ctx.fillStyle = '#228';
+        ctx.fillRect(-3, 0, 6, 12);
+        ctx.fillStyle = '#f0f';
+        ctx.fillRect(-3, 12, 6, 15 + legSpread); // Pink lower leg
+        ctx.fillStyle = '#0ff';
+        ctx.fillRect(-4, 25 + legSpread, 8, 4); // Cyan shoe
+        ctx.restore();
+
+        ctx.restore();
+    }
+
+    drawOracle(ctx, isRunning, runBob, lean) {
+        // --- Oracle Body (Tall, orange/grey coat, blue hologram orb) ---
+        ctx.save();
+        ctx.scale(0.85, 1.15); // Taller, slimmer
+
+        let bounce = runBob * 0.5; // Glides smoothly
+
+        // Torso / Suit Base
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-8, -20 + bounce, 16, 25);
+
+        // Long Grey Coat
+        ctx.fillStyle = '#aaa';
+        ctx.beginPath();
+        ctx.moveTo(-10, -22 + bounce);
+        ctx.lineTo(10, -22 + bounce);
+        ctx.lineTo(12, 18 + bounce);
+        ctx.lineTo(5, 25 + bounce); // Coat tails
+        ctx.lineTo(-5, 25 + bounce);
+        ctx.lineTo(-12, 18 + bounce);
+        ctx.closePath();
+        ctx.fill();
+
+        // Orange accents (satchel/trim)
+        ctx.strokeStyle = '#f80';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-10, -15 + bounce);
+        ctx.lineTo(10, -5 + bounce); // Diagonal strap
+        ctx.stroke();
+
+        ctx.fillStyle = '#f80';
+        ctx.fillRect(4, -5 + bounce, 8, 10); // Satchel
+
+        // Head
+        ctx.fillStyle = '#421'; // Darker skin tone
+        ctx.fillRect(-5, -30 + bounce, 10, 10);
+
+        // Cybernetics on face
+        ctx.fillStyle = '#0ff';
+        ctx.fillRect(2, -28 + bounce, 3, 6);
+
+        // Hair (Short, dreads/messy top)
+        ctx.fillStyle = '#111';
+        ctx.beginPath(); ctx.arc(0, -30 + bounce, 6, Math.PI, 0); ctx.fill();
+        ctx.fillRect(-6, -34 + bounce, 12, 4);
+
+        // --- Right Arm (Hologram Orb) ---
+        let armAngle = 0;
+        if (!this.grounded) armAngle = -0.2;
+
+        // Firing animation (thrusting orb forward)
+        if (this.rangedCooldownTimer > this.rangedCooldown - 0.15) {
+            armAngle -= 0.8;
+            bounce -= 2;
+        }
+
+        ctx.save();
+        ctx.translate(8, -16 + bounce);
+        ctx.rotate(armAngle);
+
+        // Arm
+        ctx.fillStyle = '#aaa'; // Coat sleeve
+        ctx.fillRect(-3, 0, 6, 12);
+        ctx.fillStyle = '#222'; // Glove
+        ctx.fillRect(-2, 12, 4, 4);
+
+        // Blue Hologram Orb
+        let orbPulse = (Math.sin(this.animTimer * 10) + 1) / 2; // 0 to 1
+        ctx.fillStyle = '#0ff';
+        ctx.shadowBlur = 10 + orbPulse * 15;
+        ctx.shadowColor = '#0ff';
+        ctx.globalAlpha = 0.8;
+        ctx.beginPath();
+        ctx.arc(0, 22, 6 + orbPulse * 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Hologram rings
+        ctx.strokeStyle = '#0ff';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(0, 22, 10, 3, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.globalAlpha = 1.0;
+        ctx.shadowBlur = 0;
+
+        ctx.restore();
+
+        // --- Left Arm (Shock Gauntlet/Tablet) ---
+        ctx.save();
+        ctx.translate(-8, -16 + bounce);
+
+        if (this.isAttackingMelee) {
+            let swingProg = 1 - (this.meleeTimer / this.meleeDuration);
+            // Quick palm strike
+            ctx.rotate(-Math.PI * 0.6);
+            ctx.translate(swingProg * 15, 0);
+        } else if (isRunning) {
+            ctx.rotate(Math.PI * 0.1 + Math.sin(this.animTimer * 20) * 0.3);
+        } else {
+            ctx.rotate(Math.PI * 0.2); // Holding tablet pose
+        }
+
+        // Arm
+        ctx.fillStyle = '#aaa'; // Coat sleeve
+        ctx.fillRect(-3, 0, 6, 12);
+        ctx.fillStyle = '#222'; // Gauntlet
+        ctx.fillRect(-4, 12, 8, 8);
+
+        // Glowing panel on gauntlet
+        ctx.fillStyle = '#ff0';
+        ctx.fillRect(-2, 14, 4, 4);
+
+        ctx.restore();
+
+        // --- Legs (Orange cyber pants) ---
+        let legSwing = isRunning ? Math.sin(this.animTimer * 15) * 15 : 0;
+        let legSpread = this.grounded ? 0 : 5;
+
+        // Back Leg
+        ctx.save();
+        ctx.translate(-4, 18 + bounce);
+        ctx.rotate(-legSwing * 0.05);
+        ctx.fillStyle = '#f80'; // Orange pants
+        ctx.fillRect(-3, 0, 6, 18);
+        ctx.fillStyle = '#eee'; // White/Grey shoes
+        ctx.fillRect(-4, 18 + legSpread, 8, 4);
+        ctx.restore();
+
+        // Front Leg
+        ctx.save();
+        ctx.translate(4, 18 + bounce);
+        ctx.rotate(legSwing * 0.05);
+        ctx.fillStyle = '#f80'; // Orange pants
+        ctx.fillRect(-3, 0, 6, 18);
+        ctx.fillStyle = '#eee'; // White/Grey shoes
+        ctx.fillRect(-4, 18 + legSpread, 8, 4);
+        ctx.restore();
+
+        ctx.restore();
+    }
+
+    drawDefault(ctx, isRunning, runBob, lean) {
         // --- Core Cyborg Body ---
 
         // Torso
@@ -677,31 +1447,6 @@ class Player {
         ctx.fillStyle = '#0ff';
         ctx.fillRect(-1, 2, 2, 8);
         ctx.restore();
-
-        ctx.restore(); // Restore global player transform
-
-        // --- Melee Hitbox Effect (Swoosh) ---
-        if (this.isAttackingMelee && !this.isDashing) {
-            ctx.fillStyle = 'rgba(0, 255, 0, 0.4)';
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = '#0f0';
-
-            let hx = this.x + this.width/2;
-            let hy = this.y + this.height/2;
-            let radius = 70;
-            let swingProg = 1 - (this.meleeTimer / this.meleeDuration);
-
-            ctx.beginPath();
-            if (this.facingRight) {
-                ctx.arc(hx, hy, radius, -Math.PI/2, -Math.PI/2 + swingProg * Math.PI * 2.5, false);
-                ctx.arc(hx, hy, radius - 20, -Math.PI/2 + swingProg * Math.PI * 2.5, -Math.PI/2, true);
-            } else {
-                ctx.arc(hx, hy, radius, -Math.PI/2, -Math.PI/2 - swingProg * Math.PI * 2.5, true);
-                ctx.arc(hx, hy, radius - 20, -Math.PI/2 - swingProg * Math.PI * 2.5, -Math.PI/2, false);
-            }
-            ctx.fill();
-            ctx.shadowBlur = 0;
-        }
     }
 
     drawShoulder(ctx) {
@@ -725,16 +1470,19 @@ class Player {
 }
 
 class Projectile {
-    constructor(x, y, vx, vy, isPlayerOwned) {
+    constructor(x, y, vx, vy, isPlayerOwned, width = 10, height = 4, piercing = false, color = null, damage = 25) {
         this.x = x;
         this.y = y;
         this.vx = vx;
         this.vy = vy;
-        this.width = 10;
-        this.height = 4;
+        this.width = width;
+        this.height = height;
         this.isPlayerOwned = isPlayerOwned;
         this.life = 2.0; // seconds before disappearing
-        this.color = isPlayerOwned ? '#0ff' : '#f00';
+        this.color = color || (isPlayerOwned ? '#0ff' : '#f00');
+        this.piercing = piercing;
+        this.damage = damage;
+        this.hitEnemies = [];
     }
 
     update(dt) {
@@ -767,18 +1515,53 @@ class Projectile {
 function checkMeleeHit(player) {
     let hitboxWidth = 140; // Full 360 width
     let hitboxHeight = 140;
+    let damage = 50;
+    let effectColor = '#0f0'; // Default sword color
+
+    switch(player.characterType) {
+        case 'Titan':
+            hitboxWidth = 180;
+            hitboxHeight = 180;
+            damage = 100;
+            effectColor = '#f50';
+            break;
+        case 'Nova':
+            hitboxWidth = 100;
+            hitboxHeight = 100;
+            damage = 40;
+            effectColor = '#f0f';
+            break;
+        case 'Oracle':
+            hitboxWidth = 120;
+            hitboxHeight = 120;
+            damage = 60;
+            effectColor = '#ff0';
+            break;
+        case 'Viper':
+        default:
+            hitboxWidth = 120;
+            hitboxHeight = 120;
+            damage = 40; // twin daggers hit multiple times or faster
+            effectColor = '#0ff';
+            break;
+    }
+
     let hx = player.x + player.width/2 - hitboxWidth/2;
     let hy = player.y + player.height/2 - hitboxHeight/2;
 
     let hitbox = { x: hx, y: hy, width: hitboxWidth, height: hitboxHeight };
 
-    // Check against enemies (will implement enemies in next step)
+    // Check against enemies
     for (let i = enemies.length - 1; i >= 0; i--) {
         let enemy = enemies[i];
         if (AABB(hitbox, enemy)) {
             // Hit enemy
-            createParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, 20, '#f50');
-            enemy.takeDamage(50);
+            createParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, 20, effectColor);
+            enemy.takeDamage(damage);
+            // Stun effect for Oracle's shock gauntlet
+            if (player.characterType === 'Oracle') {
+                enemy.speed = Math.max(0, enemy.speed - 50); // Slow down enemy
+            }
         }
     }
 }
@@ -1085,6 +1868,12 @@ function initGame() {
         }
     }
 
+    // Character selection
+    let charSelect = document.getElementById('character-select');
+    if (charSelect) {
+        gameState.characterType = charSelect.value;
+    }
+
     // Highscore initialization
     let nameInput = document.getElementById('player-name-input');
     gameState.playerName = nameInput.value.trim() !== '' ? nameInput.value.trim().toUpperCase() : 'UNKNOWN';
@@ -1104,7 +1893,7 @@ function initGame() {
     camera.y = 0;
 
     initLevel();
-    player = new Player(100, canvas.height - 200);
+    player = new Player(100, canvas.height - 200, gameState.characterType);
     camera.offset = canvas.width * 0.25; // 25% of screen width
 
     particles = [];
@@ -1228,11 +2017,16 @@ function update(deltaTime) {
             for (let j = enemies.length - 1; j >= 0; j--) {
                 let enemy = enemies[j];
                 if (AABB(p, enemy)) {
-                    createParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, 10, p.color);
-                    enemy.takeDamage(25);
-                    projectiles.splice(i, 1);
-                    removed = true;
-                    break;
+                    if (!p.hitEnemies.includes(enemy)) {
+                        createParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, 10, p.color);
+                        enemy.takeDamage(p.damage);
+                        p.hitEnemies.push(enemy);
+                    }
+                    if (!p.piercing) {
+                        projectiles.splice(i, 1);
+                        removed = true;
+                        break;
+                    }
                 }
             }
         } else {
