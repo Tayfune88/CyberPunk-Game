@@ -10,6 +10,9 @@ const startBtn = document.getElementById('start-btn');
 const uiLayer = document.getElementById('ui-layer');
 
 // Game State
+let animFrameId = null;
+
+// Game State
 let gameState = {
     running: false,
     score: 0,
@@ -1905,7 +1908,10 @@ function initGame() {
     enemies.push(new Enemy(600, canvas.height - 300));
 
     gameState.lastTime = performance.now();
-    requestAnimationFrame(gameLoop);
+    if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+    }
+    animFrameId = requestAnimationFrame(gameLoop);
 }
 
 function update(deltaTime) {
@@ -2097,7 +2103,7 @@ function gameLoop(timestamp) {
     // to prevent runaway/multiple concurrent loops.
     if (!gameState.running) return;
 
-    requestAnimationFrame(gameLoop);
+    animFrameId = requestAnimationFrame(gameLoop);
 
     gameState.deltaTime = (timestamp - gameState.lastTime) / 1000;
     gameState.lastTime = timestamp;
