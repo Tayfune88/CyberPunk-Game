@@ -207,10 +207,15 @@ class Player {
         this.speed = 300; // pixels per second
         this.jumpForce = -500;
         this.gravity = 1500;
+        this.maxJumps = 3;
+        this.jumpsLeft = 3;
 
         // State
         this.grounded = false;
         this.facingRight = true;
+        this.isAirRolling = false;
+        this.airRollTimer = 0;
+        this.airRollDuration = 0.5;
         this.hp = 100;
         this.maxHp = 100;
         this.energy = 100;
@@ -328,6 +333,7 @@ class Player {
                 if (this.grounded) {
                     this.vy = this.jumpForce;
                     this.grounded = false;
+                    this.jumpsLeft--;
                     keys.up = false; // Prevent holding jump
                 } else if (this.onWall) {
                     // Wall Jump
@@ -335,7 +341,20 @@ class Player {
                     this.vx = this.wallNormalX * this.wallJumpForceX;
                     this.onWall = false;
                     this.grounded = false;
+                    this.jumpsLeft = this.maxJumps - 1;
                     keys.up = false;
+                } else if (this.jumpsLeft > 0) {
+                    // Air jump
+                    this.vy = this.jumpForce;
+                    this.jumpsLeft--;
+                    keys.up = false;
+
+                    // Trigger air roll animation
+                    this.isAirRolling = true;
+                    this.airRollTimer = this.airRollDuration;
+
+                    // Neon blitz effect
+                    createParticles(this.x + this.width/2, this.y + this.height, 15, '#0ff');
                 }
             }
 
@@ -384,6 +403,12 @@ class Player {
 
         // Animation
         this.animTimer += dt;
+        if (this.isAirRolling) {
+            this.airRollTimer -= dt;
+            if (this.airRollTimer <= 0) {
+                this.isAirRolling = false;
+            }
+        }
 
         // Apply velocities
         let dx = this.vx * dt;
@@ -428,12 +453,16 @@ class Player {
                             this.grounded = true;
                             this.vy = 0;
                             this.onWall = false;
+                            this.jumpsLeft = this.maxJumps;
+                            this.isAirRolling = false;
                         }
                     } else {
                         this.y = p.y - this.height;
                         this.grounded = true;
                         this.vy = 0;
                         this.onWall = false; // Reset wall run if grounded
+                        this.jumpsLeft = this.maxJumps;
+                        this.isAirRolling = false;
                     }
                 } else if (dy < 0 && !p.isOneWay) { // Jumping into ceiling (ignore one-way)
                     this.y = p.y + p.height;
@@ -471,6 +500,12 @@ class Player {
         if (!this.facingRight && lean !== 0) lean = -lean;
 
         ctx.rotate(lean);
+
+        if (this.isAirRolling) {
+            let rollProg = 1 - (this.airRollTimer / this.airRollDuration);
+            let rollAngle = rollProg * Math.PI * 2;
+            ctx.rotate(rollAngle); // Facing scaling ensures correct direction visually
+        }
 
         // --- Core Cyborg Body ---
 
