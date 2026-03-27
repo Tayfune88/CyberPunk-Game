@@ -601,7 +601,9 @@ class Player {
 
     draw(ctx) {
         ctx.save();
-        ctx.translate(Math.floor(this.x + this.width/2), Math.floor(this.y + this.height/2));
+        let renderX = Math.round(this.x - camera.x) + Math.floor(camera.x);
+        let renderY = Math.round(this.y - camera.y) + Math.floor(camera.y);
+        ctx.translate(Math.floor(renderX + this.width/2), Math.floor(renderY + this.height/2));
 
         if (!this.facingRight) {
             ctx.scale(-1, 1);
@@ -1506,7 +1508,9 @@ class Projectile {
 
         // Draw angled projectile
         ctx.save();
-        ctx.translate(this.x, this.y);
+        let renderX = Math.round(this.x - camera.x) + Math.floor(camera.x);
+        let renderY = Math.round(this.y - camera.y) + Math.floor(camera.y);
+        ctx.translate(renderX, renderY);
         ctx.rotate(Math.atan2(this.vy, this.vx));
         ctx.fillRect(-this.width/2, -this.height/2, this.width, this.height);
         ctx.restore();
@@ -1624,7 +1628,9 @@ class Enemy {
         ctx.save();
         // Hovering effect
         let hoverY = Math.sin(this.animTimer * 4) * 5;
-        ctx.translate(this.x + this.width/2, this.y + this.height/2 + hoverY);
+        let renderX = Math.round(this.x - camera.x) + Math.floor(camera.x);
+        let renderY = Math.round(this.y - camera.y) + Math.floor(camera.y);
+        ctx.translate(Math.floor(renderX + this.width/2), Math.floor(renderY + this.height/2 + hoverY));
 
         // Face player
         if (player.x < this.x) {
@@ -1747,7 +1753,9 @@ function drawParticles(ctx) {
     for (let p of particles) {
         ctx.globalAlpha = p.life;
         ctx.fillStyle = p.color;
-        ctx.fillRect(p.x, p.y, 3, 3);
+        let renderX = Math.round(p.x - camera.x) + Math.floor(camera.x);
+        let renderY = Math.round(p.y - camera.y) + Math.floor(camera.y);
+        ctx.fillRect(renderX, renderY, 3, 3);
         ctx.globalAlpha = 1.0;
     }
 }
