@@ -2066,7 +2066,7 @@ function draw(ctx) {
     // Draw background grid (cyberpunk style) with parallax/camera offset
     ctx.strokeStyle = '#112';
     ctx.lineWidth = 1;
-    let offsetX = camera.x % 50;
+    let offsetX = Math.floor(camera.x) % 50;
 
     ctx.beginPath();
     for(let i = -offsetX; i < canvas.width; i += 50) {
@@ -2079,7 +2079,7 @@ function draw(ctx) {
 
     // Apply camera transform for world objects
     ctx.save();
-    ctx.translate(-camera.x, -camera.y);
+    ctx.translate(-Math.floor(camera.x), -Math.floor(camera.y));
 
     // Draw platforms
     platforms.forEach(p => p.draw(ctx));
