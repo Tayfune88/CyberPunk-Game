@@ -1,8 +1,9 @@
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+let canvas = document.getElementById('gameCanvas');
+let ctx = canvas.getContext('2d');
 const scoreDisplay = document.getElementById('score');
 const healthBar = document.getElementById('health-bar');
 const energyBar = document.getElementById('energy-bar');
+const fpsCounter = document.getElementById('fps-counter');
 const gameOverScreen = document.getElementById('game-over-screen');
 const restartBtn = document.getElementById('restart-btn');
 const startScreen = document.getElementById('start-screen');
@@ -21,7 +22,13 @@ let gameState = {
     startTime: 0,
     topScore: 0,
     fireworksTriggered: false,
-    characterType: 'Viper'
+    characterType: 'Viper',
+    fpsMode: 'vsync',
+    fpsInterval: 1000 / 60,
+    lastRenderTime: 0,
+    framesThisSecond: 0,
+    lastFpsTime: 0,
+    currentFps: 0
 };
 
 // Highscore Functions
@@ -1874,6 +1881,42 @@ function initGame() {
         gameState.characterType = charSelect.value;
     }
 
+    // FPS Mode initialization
+    let fpsSelect = document.getElementById('fps-select');
+    gameState.fpsMode = fpsSelect ? fpsSelect.value : 'vsync';
+
+    // Recreate canvas to apply or remove desynchronized flag
+    let oldCanvas = document.getElementById('gameCanvas');
+    let newCanvas = oldCanvas.cloneNode(true);
+    oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+    canvas = newCanvas;
+
+    // Re-attach event listeners to new canvas
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (e.button === 0) mouse.leftClick = true;
+        if (e.button === 2) mouse.rightClick = true;
+    });
+
+    canvas.addEventListener('mouseup', (e) => {
+        if (e.button === 0) mouse.leftClick = false;
+        if (e.button === 2) mouse.rightClick = false;
+    });
+
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    if (gameState.fpsMode === 'vsync') {
+        ctx = canvas.getContext('2d');
+    } else {
+        // Use desynchronized for uncapped and 60fps lock to reduce latency
+        ctx = canvas.getContext('2d', { desynchronized: true });
+    }
+
     // Highscore initialization
     let nameInput = document.getElementById('player-name-input');
     gameState.playerName = nameInput.value.trim() !== '' ? nameInput.value.trim().toUpperCase() : 'UNKNOWN';
@@ -1901,11 +1944,22 @@ function initGame() {
     enemies = [];
     enemySpawnTimer = 2.0;
 
+    gameState.framesThisSecond = 0;
+    gameState.lastFpsTime = performance.now();
+    gameState.currentFps = 0;
+    if (fpsCounter) fpsCounter.innerText = 0;
+
     // Spawn initial enemy ahead
     enemies.push(new Enemy(600, canvas.height - 300));
 
     gameState.lastTime = performance.now();
-    requestAnimationFrame(gameLoop);
+    gameState.lastRenderTime = performance.now();
+
+    if (gameState.fpsMode === 'vsync' || gameState.fpsMode === '60') {
+        requestAnimationFrame(gameLoop);
+    } else {
+        setTimeout(() => gameLoop(performance.now()), 0);
+    }
 }
 
 function update(deltaTime) {
@@ -2097,10 +2151,33 @@ function gameLoop(timestamp) {
     // to prevent runaway/multiple concurrent loops.
     if (!gameState.running) return;
 
-    requestAnimationFrame(gameLoop);
+    if (gameState.fpsMode === 'vsync') {
+        requestAnimationFrame(gameLoop);
+    } else if (gameState.fpsMode === '60') {
+        requestAnimationFrame(gameLoop);
+        // Calculate time elapsed since last render
+        let elapsed = timestamp - gameState.lastRenderTime;
+        if (elapsed < gameState.fpsInterval) {
+            // Not enough time has passed, skip this frame
+            return;
+        }
+        // Adjust for next frame
+        gameState.lastRenderTime = timestamp - (elapsed % gameState.fpsInterval);
+    } else {
+        setTimeout(() => gameLoop(performance.now()), 0);
+    }
 
     gameState.deltaTime = (timestamp - gameState.lastTime) / 1000;
     gameState.lastTime = timestamp;
+
+    // FPS Calculation
+    gameState.framesThisSecond++;
+    if (timestamp - gameState.lastFpsTime >= 1000) {
+        gameState.currentFps = gameState.framesThisSecond;
+        if (fpsCounter) fpsCounter.innerText = gameState.currentFps;
+        gameState.framesThisSecond = 0;
+        gameState.lastFpsTime = timestamp;
+    }
 
     // Cap delta time to prevent huge jumps when tab is inactive
     if (gameState.deltaTime > 0.1) gameState.deltaTime = 0.1;
