@@ -23,7 +23,9 @@ let gameState = {
     topScore: 0,
     fireworksTriggered: false,
     characterType: 'Viper',
-    vsyncEnabled: true,
+    fpsMode: 'vsync',
+    fpsInterval: 1000 / 60,
+    lastRenderTime: 0,
     framesThisSecond: 0,
     lastFpsTime: 0,
     currentFps: 0
@@ -1879,9 +1881,9 @@ function initGame() {
         gameState.characterType = charSelect.value;
     }
 
-    // VSync initialization
-    let vsyncCheckbox = document.getElementById('vsync-checkbox');
-    gameState.vsyncEnabled = vsyncCheckbox ? vsyncCheckbox.checked : true;
+    // FPS Mode initialization
+    let fpsSelect = document.getElementById('fps-select');
+    gameState.fpsMode = fpsSelect ? fpsSelect.value : 'vsync';
 
     // Recreate canvas to apply or remove desynchronized flag
     let oldCanvas = document.getElementById('gameCanvas');
@@ -1908,9 +1910,10 @@ function initGame() {
 
     canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-    if (gameState.vsyncEnabled) {
+    if (gameState.fpsMode === 'vsync') {
         ctx = canvas.getContext('2d');
     } else {
+        // Use desynchronized for uncapped and 60fps lock to reduce latency
         ctx = canvas.getContext('2d', { desynchronized: true });
     }
 
@@ -1950,7 +1953,9 @@ function initGame() {
     enemies.push(new Enemy(600, canvas.height - 300));
 
     gameState.lastTime = performance.now();
-    if (gameState.vsyncEnabled) {
+    gameState.lastRenderTime = performance.now();
+
+    if (gameState.fpsMode === 'vsync' || gameState.fpsMode === '60') {
         requestAnimationFrame(gameLoop);
     } else {
         setTimeout(() => gameLoop(performance.now()), 0);
@@ -2146,8 +2151,18 @@ function gameLoop(timestamp) {
     // to prevent runaway/multiple concurrent loops.
     if (!gameState.running) return;
 
-    if (gameState.vsyncEnabled) {
+    if (gameState.fpsMode === 'vsync') {
         requestAnimationFrame(gameLoop);
+    } else if (gameState.fpsMode === '60') {
+        requestAnimationFrame(gameLoop);
+        // Calculate time elapsed since last render
+        let elapsed = timestamp - gameState.lastRenderTime;
+        if (elapsed < gameState.fpsInterval) {
+            // Not enough time has passed, skip this frame
+            return;
+        }
+        // Adjust for next frame
+        gameState.lastRenderTime = timestamp - (elapsed % gameState.fpsInterval);
     } else {
         setTimeout(() => gameLoop(performance.now()), 0);
     }
