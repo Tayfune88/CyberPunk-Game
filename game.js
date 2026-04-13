@@ -1841,6 +1841,8 @@ function generatePlatforms() {
     platformGenerator.lastX = startX;
 }
 
+let animFrameId;
+
 function initGame() {
     gameState.running = true;
     gameState.score = 0;
@@ -1905,7 +1907,10 @@ function initGame() {
     enemies.push(new Enemy(600, canvas.height - 300));
 
     gameState.lastTime = performance.now();
-    requestAnimationFrame(gameLoop);
+    if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+    }
+    animFrameId = requestAnimationFrame(gameLoop);
 }
 
 function update(deltaTime) {
@@ -2066,7 +2071,7 @@ function draw(ctx) {
     // Draw background grid (cyberpunk style) with parallax/camera offset
     ctx.strokeStyle = '#112';
     ctx.lineWidth = 1;
-    let offsetX = camera.x % 50;
+    let offsetX = Math.floor(camera.x) % 50;
 
     ctx.beginPath();
     for(let i = -offsetX; i < canvas.width; i += 50) {
@@ -2079,7 +2084,7 @@ function draw(ctx) {
 
     // Apply camera transform for world objects
     ctx.save();
-    ctx.translate(-camera.x, -camera.y);
+    ctx.translate(-Math.floor(camera.x), -Math.floor(camera.y));
 
     // Draw platforms
     platforms.forEach(p => p.draw(ctx));
@@ -2097,7 +2102,7 @@ function gameLoop(timestamp) {
     // to prevent runaway/multiple concurrent loops.
     if (!gameState.running) return;
 
-    requestAnimationFrame(gameLoop);
+    animFrameId = requestAnimationFrame(gameLoop);
 
     gameState.deltaTime = (timestamp - gameState.lastTime) / 1000;
     gameState.lastTime = timestamp;
