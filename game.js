@@ -3,6 +3,7 @@ let ctx = canvas.getContext('2d');
 const scoreDisplay = document.getElementById('score');
 const healthBar = document.getElementById('health-bar');
 const energyBar = document.getElementById('energy-bar');
+const fpsCounter = document.getElementById('fps-counter');
 const gameOverScreen = document.getElementById('game-over-screen');
 const restartBtn = document.getElementById('restart-btn');
 const startScreen = document.getElementById('start-screen');
@@ -22,7 +23,10 @@ let gameState = {
     topScore: 0,
     fireworksTriggered: false,
     characterType: 'Viper',
-    vsyncEnabled: true
+    vsyncEnabled: true,
+    framesThisSecond: 0,
+    lastFpsTime: 0,
+    currentFps: 0
 };
 
 // Highscore Functions
@@ -1937,6 +1941,11 @@ function initGame() {
     enemies = [];
     enemySpawnTimer = 2.0;
 
+    gameState.framesThisSecond = 0;
+    gameState.lastFpsTime = performance.now();
+    gameState.currentFps = 0;
+    if (fpsCounter) fpsCounter.innerText = 0;
+
     // Spawn initial enemy ahead
     enemies.push(new Enemy(600, canvas.height - 300));
 
@@ -2145,6 +2154,15 @@ function gameLoop(timestamp) {
 
     gameState.deltaTime = (timestamp - gameState.lastTime) / 1000;
     gameState.lastTime = timestamp;
+
+    // FPS Calculation
+    gameState.framesThisSecond++;
+    if (timestamp - gameState.lastFpsTime >= 1000) {
+        gameState.currentFps = gameState.framesThisSecond;
+        if (fpsCounter) fpsCounter.innerText = gameState.currentFps;
+        gameState.framesThisSecond = 0;
+        gameState.lastFpsTime = timestamp;
+    }
 
     // Cap delta time to prevent huge jumps when tab is inactive
     if (gameState.deltaTime > 0.1) gameState.deltaTime = 0.1;
