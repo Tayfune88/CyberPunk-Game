@@ -1,5 +1,5 @@
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+let canvas = document.getElementById('gameCanvas');
+let ctx = canvas.getContext('2d');
 const scoreDisplay = document.getElementById('score');
 const healthBar = document.getElementById('health-bar');
 const energyBar = document.getElementById('energy-bar');
@@ -21,7 +21,8 @@ let gameState = {
     startTime: 0,
     topScore: 0,
     fireworksTriggered: false,
-    characterType: 'Viper'
+    characterType: 'Viper',
+    vsyncEnabled: true
 };
 
 // Highscore Functions
@@ -1874,6 +1875,41 @@ function initGame() {
         gameState.characterType = charSelect.value;
     }
 
+    // VSync initialization
+    let vsyncCheckbox = document.getElementById('vsync-checkbox');
+    gameState.vsyncEnabled = vsyncCheckbox ? vsyncCheckbox.checked : true;
+
+    // Recreate canvas to apply or remove desynchronized flag
+    let oldCanvas = document.getElementById('gameCanvas');
+    let newCanvas = oldCanvas.cloneNode(true);
+    oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+    canvas = newCanvas;
+
+    // Re-attach event listeners to new canvas
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (e.button === 0) mouse.leftClick = true;
+        if (e.button === 2) mouse.rightClick = true;
+    });
+
+    canvas.addEventListener('mouseup', (e) => {
+        if (e.button === 0) mouse.leftClick = false;
+        if (e.button === 2) mouse.rightClick = false;
+    });
+
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    if (gameState.vsyncEnabled) {
+        ctx = canvas.getContext('2d');
+    } else {
+        ctx = canvas.getContext('2d', { desynchronized: true });
+    }
+
     // Highscore initialization
     let nameInput = document.getElementById('player-name-input');
     gameState.playerName = nameInput.value.trim() !== '' ? nameInput.value.trim().toUpperCase() : 'UNKNOWN';
@@ -1905,7 +1941,11 @@ function initGame() {
     enemies.push(new Enemy(600, canvas.height - 300));
 
     gameState.lastTime = performance.now();
-    requestAnimationFrame(gameLoop);
+    if (gameState.vsyncEnabled) {
+        requestAnimationFrame(gameLoop);
+    } else {
+        setTimeout(() => gameLoop(performance.now()), 0);
+    }
 }
 
 function update(deltaTime) {
@@ -2097,7 +2137,11 @@ function gameLoop(timestamp) {
     // to prevent runaway/multiple concurrent loops.
     if (!gameState.running) return;
 
-    requestAnimationFrame(gameLoop);
+    if (gameState.vsyncEnabled) {
+        requestAnimationFrame(gameLoop);
+    } else {
+        setTimeout(() => gameLoop(performance.now()), 0);
+    }
 
     gameState.deltaTime = (timestamp - gameState.lastTime) / 1000;
     gameState.lastTime = timestamp;
